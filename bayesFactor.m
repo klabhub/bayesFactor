@@ -575,5 +575,50 @@ classdef bayesFactor < handle
             end
         end
         
+        function bf10 = binotest(k,n,p)           
+            % Bayes factor for binomial test with k successes, n trials and base probability p.
+            % INPUT 
+            %  k - number of successes
+            %  n - number of draws
+            %  p - true binomial probabiliy 
+            % OUTPUT
+            % bf - Bayes Factor representing the evidence that this n/k
+            % could result from random draws with p (BF>1) or not (BF<1)
+            
+            
+            % Code from Sam Schwarzkopf
+            F = @(q,k,n,p) nchoosek(n,k) .* q.^k .* (1-q).^(n-k);
+            bf01 = (nchoosek(n,k) .* p.^k .* (1-p).^(n-k)) / integral(@(q) F(q,k,n,p),0,1);
+            bf10 = 1/bf01;
+        end
+        
+        
+        function [bf10,r,p] = corr(arg1,arg2)
+            % Calculate the Bayes Factor for Pearson correlation between two
+            % variables. 
+            % INPUT
+            % (x,y)  - two vectors of equal length.
+            % OR
+            % (r,b)  - the correlation and number of samples
+            %
+            % OUTPUT
+            % bf10 = the Bayes Factor for the hypothesis that r is differnt
+            %           from zero (two-tailed).
+            % r - the correlation
+            % p - the tradiational p-value (only returned if x,y are
+            %       provided).
+            % 
+            if isscalar(arg1) && isscalar(arg2)
+                r= arg1;
+                n= arg2;
+            else                
+                [r,p] = corr(x,y,'type','pearson');
+                n=numel(x);
+            end
+            
+            % Code from Sam Schwarzkopf
+            F = @(g,r,n) exp(((n-2)./2).*log(1+g)+(-(n-1)./2).*log(1+(1-r.^2).*g)+(-3./2).*log(g)+-n./(2.*g));
+            bf10 = sqrt((n/2)) / gamma(1/2) * integral(@(g) F(g,r,n),0,Inf);
+        
     end
 end
