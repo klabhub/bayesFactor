@@ -10,13 +10,6 @@ function [bf10,model] = lme(tbl,response,fixedEffects,randomEffects,varargin)
 %                   effects.
 %
 % Parm/Value pairs:
-% 'encoding'  - How to encode the different levels of the model.
-%               'effects','reference','referenceLast' are standard dummy
-%               var encoding options (see LinearMixedModel), while 'Rouder'
-%               is a variant to implement the zero--sum constraint for
-%               fixed effects that gives each level equal marginal prior
-%               (and does not favor a specific level). This is the default.
-%
 % 'sharedPriors' - Which columns (i.e. factors) in the table should share a
 %                   their prior on their effect size. The default is that
 %                   all levels within a factor share a prior.
@@ -39,18 +32,13 @@ function [bf10,model] = lme(tbl,response,fixedEffects,randomEffects,varargin)
 
 p=inputParser;
 p.addParameter('interactions','none',@(x) (ischar(x) || iscell(x)));
-p.addParameter('encoding','rouder',@(x) (ischar(x) && ismember(lower(x),{'effects','reference','referenceLast','rouder'})))
 p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.
 p.addParameter('nDimsForMC',4,@(x)(x<=4)); % Passed to bf.anova
 p.parse(varargin{:});
 
-
 nrFixedEffects =numel(fixedEffects);
 nrRandomEffects =numel(randomEffects);
 
-if nrRandomEffects>0
-    warning('Random effects modeling does not seem right... see testSuite -rouderFigure5');
-end
 %% Setup list of interactions
 if ischar(p.Results.interactions)
     switch upper(p.Results.interactions)
@@ -97,23 +85,8 @@ for i=1:nrFixedEffects+nrRandomEffects
     if ismember(allMain{i},randomEffects)
         % Random effect - Keep full dummy X
     else
-        switch upper(p.Results.encoding)
-            case 'REFERENCE'
-                % Treatment contrast: effects defined relative to the first level
-                thisX =thisX(:,2:end);
-            case 'REFERENCELAST'
-                % Treatment contrast: effects defined relative to the first level
-                thisX =thisX(:,1:end-1);
-            case 'EFFECTS'
-                % Relative to mean with -1 for last level.
-                last = thisX(:,end)==1;
-                thisX =thisX(:,1:end-1);
-                thisX(last,:) = -1;
-            case 'ROUDER'
-                % Sum-to-zero contrasts that equates marginal priors across levels.
-                % (Rouder 2019)
-                [~,thisX] = bf.fixedEffectConstraint(thisX); 
-        end
+        % Sum-to-zero contrasts that equates marginal priors across levels.    
+        thisX = bf.zeroSumConstraint(thisX);         
     end
     designMatrix{i} =thisX; % Store for later use
 end
@@ -122,18 +95,17 @@ end
 for i=1:nrInteractions
     aName =extractBefore(interactions{i},':');
     bName = extractAfter(interactions{i},':');
-    a =ismember(allMain,aName);
-    b =ismember(allMain,bName);
-    
     thisA = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',aName,'responseVar','');
     thisB = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',bName,'responseVar','');
     if ismember(aName,fixedEffects)
-        [~,thisA] = bf.fixedEffectConstraint(thisA); 
+        thisA = bf.zeroSumConstraint(thisA); 
     end
     if ismember(bName,fixedEffects)
-        [~,thisB] = bf.fixedEffectConstraint(thisB); 
+        thisB = bf.zeroSumConstraint(thisB); 
     end
-    designMatrix{nrFixedEffects+nrRandomEffects+i} = bf.interaction(thisA,thisB);          
+    thisX = bf.interaction(thisA,thisB);  
+    %thisX = thisX -mean(thisX,2);
+    designMatrix{nrFixedEffects+nrRandomEffects+i} = thisX; 
 end
 
 
@@ -153,6 +125,6 @@ else
     end
 end
 %% Call the anova function for the actual analysis
-bf10 = bf.anova(tbl.(response),[designMatrix{:}],'sharedPriors',sharedPriorIx,'nDimsForMC',p.Results.nDimsForMC);
+bf10 = bf.nWayAnova(tbl.(response),[designMatrix{:}],'sharedPriors',sharedPriorIx,'nDimsForMC',p.Results.nDimsForMC);
 
 

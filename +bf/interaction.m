@@ -1,5 +1,8 @@
 function X = interaction(Xa,Xb)
 % Create all interaction terms from two dummy coded design matrices.
+% (See Box II in Rouder et al. 2012)
+%
+% INPUT
 % Xa, Xb = [nrObservations nrA] and [nrObservations nrB] 
 %           design matrices with matching number of observation (rows)
 % OUTPUT

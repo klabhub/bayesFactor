@@ -1,4 +1,4 @@
-function bf10 = anova(y,X,varargin)
+function bf10 = nWayAnova(y,X,varargin)
 % ANOVA BF
 % y = data values
 % X = design matrix for ANOVA (indicator vars)  no constant term
@@ -8,8 +8,6 @@ function bf10 = anova(y,X,varargin)
 % of X) share the same prior. [{1:nrEffects}]: all effects share the same prior.
 %
 % BK 2018
-%assert(~any(all(X==1,1)),'The design matrix should not contain the constant term');
-%assert(all(ismember(X(:),[0 1])),'The design matrix should use only indicator variables (0/1)');
 nrEffects = size(X,2);
 
 p =inputParser;

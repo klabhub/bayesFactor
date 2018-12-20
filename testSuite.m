@@ -65,14 +65,14 @@ figure(5);
 clf;
 
 h = bar(1:3,bf10);
-set(gca,'XTick',1:3,'XTIckLabel',{'Orientation','Frequency','Interaction'},'YScale','Log','YTick',[0.01 1 10 100 ])
+set(gca,'XTick',1:3,'XTIckLabel',{'Orientation','Frequency','Interaction'},'YScale','Log','YTick',[0.1 1 10 100 ])
 set(gca,'Ylim',[0.1 200])
 for i=1:4
-h(i).FaceColor=  (i-1)*0.3*ones(1,3);
+h(i).FaceColor=  (i-1)*0.3333*ones(1,3);
 h(i).BaseValue = 1;
 end
-hold on;
-plot(xlim,[1 1],'k:')
+legend(h,{'Both Fixed','Orientation Fixed','Frequency Fixed','Both Random'},'Location','NorthEast')
+ylabel 'Bayes Factor vs. Null Model'
 
 end
 %% Rouder figure 4
