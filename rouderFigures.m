@@ -50,10 +50,10 @@ function rouderFigure5(data)
 % differences between fixed and random effects.
 bf= bayesFactor;
 % Both ori and freq fixed
-bfFullFixed= bf.linearMixedModel(data,'rt',{'ori','freq'},{},'interactions','all');
-bfBothFixed= bf.linearMixedModel(data,'rt',{'ori','freq'},{},'interactions','none');
-bfOriFixed= bf.linearMixedModel(data,'rt',{'ori'},{},'interactions',{'ori:freq'});
-bfFreqFixed= bf.linearMixedModel(data,'rt',{'freq'},{},'interactions',{'ori:freq'});
+bfFullFixed= bf.linearMixedModel(data,'rt~ori*freq');
+bfBothFixed= bf.linearMixedModel(data,'rt~ori+freq');
+bfOriFixed= bf.linearMixedModel(data,'rt~ori +ori:freq');
+bfFreqFixed= bf.linearMixedModel(data,'rt~freq+ ori:freq');
 
 bf10  = nan(3,4); % 3 factors (ori,freq,int) and 4 kinds of effects (fixed, mixed, mixed, random)
 bf10(1,1) = bfFullFixed/bfFreqFixed; % Main or int effect of ori
@@ -62,10 +62,10 @@ bf10(3,1) = bfFullFixed/bfBothFixed; % Interaction
 
 
 % Ori fixed, freq random
-bfFullMixed= bf.linearMixedModel(data,'rt',{'ori'},{'freq'},'interactions','all');
-bfBothMixed= bf.linearMixedModel(data,'rt',{'ori'},{'freq'},'interactions','none');
-bfOriMixed= bf.linearMixedModel(data,'rt',{'ori'},{},'interactions',{'ori:freq'});
-bfFreqMixed= bf.linearMixedModel(data,'rt',{},{'freq'},'interactions',{'ori:freq'});
+bfFullMixed= bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'freq'});
+bfBothMixed= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'freq'});
+bfOriMixed= bf.linearMixedModel(data,'rt~ori +ori:freq','treatAsRandom',{'freq'});
+bfFreqMixed= bf.linearMixedModel(data,'rt~freq+ ori:freq','treatAsRandom',{'freq'});
 
 bf10(1,2) = bfFullMixed/bfFreqMixed;
 bf10(2,2) = bfFullMixed/bfOriMixed;
@@ -73,20 +73,20 @@ bf10(3,2) = bfFullMixed/bfBothMixed;
 
 
 % Ori random , freq fixed
-bfFullMixed= bf.linearMixedModel(data,'rt',{'freq'},{'ori'},'interactions','all');
-bfBothMixed= bf.linearMixedModel(data,'rt',{'freq'},{'ori'},'interactions','none');
-bfOriMixed= bf.linearMixedModel(data,'rt',{},{'ori'},'interactions',{'ori:freq'});
-bfFreqMixed= bf.linearMixedModel(data,'rt',{'freq'},{},'interactions',{'ori:freq'});
+bfFullMixed= bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'ori'});
+bfBothMixed= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'ori'});
+bfOriMixed= bf.linearMixedModel(data,'rt~ori +ori:freq','treatAsRandom',{'ori'});
+bfFreqMixed= bf.linearMixedModel(data,'rt~freq+ ori:freq','treatAsRandom',{'ori'});
 
 bf10(1,3) = bfFullMixed/bfFreqMixed;
 bf10(2,3) = bfFullMixed/bfOriMixed;
 bf10(3,3) = bfFullMixed/bfBothMixed;
 
 % Both random
-bfFullRandom = bf.linearMixedModel(data,'rt',{},{'ori','freq'},'interactions','all');
-bfBothRandom= bf.linearMixedModel(data,'rt',{},{'ori','freq'},'interactions','none');
-bfOriRandom = bf.linearMixedModel(data,'rt',{},{'ori'},'interactions',{'ori:freq'});
-bfFreqRandom= bf.linearMixedModel(data,'rt',{},{'freq'},'interactions',{'ori:freq'});
+bfFullRandom =bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'freq','ori'});
+bfBothRandom= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'freq','ori'});
+bfOriRandom= bf.linearMixedModel(data,'rt~ori+ori:freq','treatAsRandom',{'freq','ori'});
+bfFreqRandom= bf.linearMixedModel(data,'rt~freq+ori:freq','treatAsRandom',{'freq','ori'});
 
 bf10(1,4) = bfFullRandom/bfFreqRandom;
 bf10(2,4) = bfFullRandom/bfOriRandom;
@@ -127,17 +127,18 @@ effects = [0   0   0
     0.4 0.4 0.5];
 
 nrEffects = size(effects,1);
-tic
+% Create a design matrix from the data, only to simulate fake rt's with
+% different effects
 X= classreg.regr.modelutils.designmatrix(data,'intercept',false,'responsevar','rt','DummyVarCoding','effects','PredictorVars',{'ori','freq'},'model','interactions');
 for j=1:nrEffects
     rt = X *effects(j,:)';
     for i=1:nrSets
         tmp  =data;
         tmp.rt =rt + randn([size(X,1) 1]);
-        bfFull = bf.linearMixedModel(tmp,'rt',{'freq','ori'},{},'interactions','all','sharedPriors','within');
-        bfMain = bf.linearMixedModel(tmp,'rt',{'freq','ori'},{},'interactions','none','sharedPriors','within');
-        bfOri(i,j)  = bf.linearMixedModel(tmp,'rt',{'ori'},{});
-        bfFreq(i,j)  = bf.linearMixedModel(tmp,'rt',{'freq'},{});
+        bfFull = bf.linearMixedModel(tmp,'rt~ori*freq');
+        bfMain = bf.linearMixedModel(tmp,'rt~ori+freq');
+        bfOri(i,j)  = bf.linearMixedModel(tmp,'rt~ori');
+        bfFreq(i,j)  = bf.linearMixedModel(tmp,'rt~freq');
         bfInteraction(i,j) = bfFull/bfMain;
     end
 end

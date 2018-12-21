@@ -18,32 +18,27 @@ classdef bayesFactor < handle
         stepG = 0.05;
         nrSamples = 10000;
         nDimsForMC = 3; % If there are this many dimensions, use MC integration
-                        % 1 and 2D integration work fine with standard
-                        % integral.m but 3d is slow and higher not
-                        % possible. 
+        % 1 and 2D integration work fine with standard
+        % integral.m but 3d is slow and higher not
+        % possible.
     end
     
     %% Public acces functions - the main interface
     methods (Access=public)
         
-        function o = bayesFactor           
-            % Constructor
+        function o = bayesFactor
+            % Constructor. Nothing to do.
             
         end
         
-        
-        
-        function [bf10,model] = linearMixedModel(o,tbl,response,fixedEffects,randomEffects,varargin)
+        function [bf10,model,aov] = linearMixedModel(o,tbl,formula,varargin)
             % Analyze table data with a linear mixed effects model.
             %
             % INPUT
             % tbl = The table with data.
-            % response = name of the column that represents the response
-            % fixedEffects = cell array of columns that should be modeled as fixed
-            %                   effects
-            % randomEffects = cell array of columns that should be modeled as random
-            %                   effects.
-            %
+            % formula = The linear (mixed) model using Wilcoxon notation.
+            %           See LinearModel and LinearMixedModel in the stats
+            %           toolbox for definition
             % Parm/Value pairs:
             % 'sharedPriors' - Which columns (i.e. factors) in the table should share a
             %                   their prior on their effect size. The default is that
@@ -59,35 +54,38 @@ classdef bayesFactor < handle
             % 'interactions'    - Include interactions ('all') or not ('none'). Default
             %                       is  'none'.  Or specify a set {'a:b','c:d'}
             %
+            % OUTPUT
+            % bf10 - The Bayes Factor comparing the model to the model with intercept only.
+            %       To compute BF for more refined hypotheses you compute
+            %       a BF for the full model, and a restricted model and
+            %       then take the ratio. See rouderFigures for examples.
+            % model - A linear model or linear mixed model from the
+            %           statistics toolbox
+            % aov    - results of an ANOVA
+            %
             % BK -2018
             
             p=inputParser;
             p.addParameter('interactions','none',@(x) (ischar(x) || iscell(x)));
-            p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.            
+            p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.
+            p.addParameter('treatAsRandom',{});
             p.parse(varargin{:});
             
-            nrFixedEffects =numel(fixedEffects);
-            nrRandomEffects =numel(randomEffects);
-            
-            %% Setup list of interactions
-            if ischar(p.Results.interactions)
-                switch upper(p.Results.interactions)
-                    case 'FIXED'
-                        interactions = o.allInteractions(fixedEffects);
-                    case 'RANDOM'
-                        interactions = o.allInteractions(randomEffects);
-                    case 'ALL'
-                        interactions = o.allInteractions(cat(2,fixedEffects,randomEffects));
-                    case 'NONE'
-                        interactions = {};
-                end
+            formula = classreg.regr.LinearMixedFormula(formula);
+            if ~isempty(formula.RELinearFormula)
+                 error('Sorry, grouping has not been implemented yet.)');
             else
-                interactions = p.Results.interactions;
+                feFormula = formula.FELinearFormula;
+                isMain= ~cellfun(@(x) (contains(x,'(')|| contains(x,':')),feFormula.TermNames);
+                mainEffects  =feFormula.TermNames(isMain)';
+                isInteraction= cellfun(@(x) (contains(x,':')),feFormula.TermNames);
+                interactions = feFormula.TermNames(isInteraction)';
+                response = formula.ResponseName;
             end
-            
+            nrMainEffects =numel(mainEffects);
             nrInteractions = numel(interactions);
-            allTerms = cat(2,fixedEffects,randomEffects,interactions);
-            nrAllTerms = nrFixedEffects+nrRandomEffects+nrInteractions;
+            allTerms = cat(2,mainEffects,interactions);
+            nrAllTerms = nrMainEffects+nrInteractions;
             
             %% Setup sharing of priors as requested
             if ischar(p.Results.sharedPriors)
@@ -107,12 +105,11 @@ classdef bayesFactor < handle
             sharedPriorIx = cell(1,numel(sharedPriors));
             [sharedPriorIx{:}] = deal([]);
             
-            %% Construct the design matrix for the fixed effects
-            designMatrix = cell(1,nrFixedEffects+nrRandomEffects +nrInteractions);
-            allMain = cat(2,fixedEffects,randomEffects);
-            for i=1:nrFixedEffects+nrRandomEffects
-                thisX = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',allMain{i},'responseVar','');
-                if ismember(allMain{i},randomEffects)
+            %% Construct the design matrix for the main effects
+            designMatrix = cell(1,nrMainEffects +nrInteractions);
+            for i=1:nrMainEffects
+                thisX = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',mainEffects{i},'responseVar','');
+                if ismember(mainEffects{i},p.Results.treatAsRandom)
                     % Random effect - Keep full dummy X
                 else
                     % Sum-to-zero contrasts that equates marginal priors across levels.
@@ -127,15 +124,15 @@ classdef bayesFactor < handle
                 bName = extractAfter(interactions{i},':');
                 thisA = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',aName,'responseVar','');
                 thisB = classreg.regr.modelutils.designmatrix(tbl,'model','linear','intercept',false,'DummyVarCoding','full','PredictorVars',bName,'responseVar','');
-                if ismember(aName,fixedEffects)
+                if ~ismember(aName,p.Results.treatAsRandom)
                     thisA = o.zeroSumConstraint(thisA);
                 end
-                if ismember(bName,fixedEffects)
+                if ~ismember(bName,p.Results.treatAsRandom)
                     thisB = o.zeroSumConstraint(thisB);
                 end
                 thisX = o.interaction(thisA,thisB);
                 %thisX = thisX -mean(thisX,2);
-                designMatrix{nrFixedEffects+nrRandomEffects+i} = thisX;
+                designMatrix{nrMainEffects+i} = thisX;
             end
             
             
@@ -157,6 +154,10 @@ classdef bayesFactor < handle
             %% Call the anova function for the actual analysis
             bf10 = o.nWayAnova(tbl.(response),[designMatrix{:}],'sharedPriors',sharedPriorIx);
             
+            
+            if nargout>1
+                % Traditional
+            end
         end
         
         
@@ -166,7 +167,7 @@ classdef bayesFactor < handle
     %% Internal computations.
     methods (Access = protected)
         
-         function v = mcIntegral(o,fun,prior,nrDims)
+        function v = mcIntegral(o,fun,prior,nrDims)
             % Monte Carlo integration
             %
             % INPUT
@@ -179,7 +180,7 @@ classdef bayesFactor < handle
             % OUTPUT
             % v -  The value of the integral. (Typically the BF10).
             
-                        
+            
             %% Setup the PDF to do importance sampling
             gRange =  o.minG:o.stepG:o.maxG;
             pdf = prior(gRange);
@@ -193,7 +194,7 @@ classdef bayesFactor < handle
             bf10Samples = fun(g);
             pg = prod(prior(g),1);  % Probability of each g combination
             v = mean(bf10Samples./pg); % Expectation value- = integral.
-         end
+        end
         
         
         function bf10 = nWayAnova(o,y,X,varargin)
@@ -235,13 +236,13 @@ classdef bayesFactor < handle
                 end
             end
         end
-                        
+        
         
     end
     
     %% Helper functions
-    methods (Static)
-          function G = gMatrix(grouping,g)
+    methods (Static, Hidden)
+        function G = gMatrix(grouping,g)
             % Generate a matrix in which each row corresponds to an effect, each column a value
             % that will be integrated over. The grouping cell array determines which of
             % the effects share a prior (i.e. levles of the same factor) and which have
@@ -299,7 +300,7 @@ classdef bayesFactor < handle
                 end
             end
         end
-      
+        
         
         function [Xa,Qa] = zeroSumConstraint(X)
             % Impose a zero-sum constraint on a dummy coded predictor matrix X
@@ -419,10 +420,13 @@ classdef bayesFactor < handle
             end
             y(~z) = bayesFactor.inverseGammaPdf(x(~z),df/2,df*scale/2);
         end
-               
         
-        function [bf10,H,pValue,CI,stats] = ttest2(X,Y,varargin)
-            % Calculates JZS Bayes Factor for a two-sample t-test.
+    end
+    
+    %% Public User interface
+    methods (Static, Hidden=false)
+        function [bf10,p,CI,stats] = ttest2(X,Y,varargin)
+            % Calculates Bayes Factor for a two-sample t-test.
             % X - Sample 1
             % Y - Sample 2 (not necessarily of the same size)
             %
@@ -439,8 +443,7 @@ classdef bayesFactor < handle
             %
             % OUTPUT
             % bf10 - The Bayes Factor for the hypothesis that the means of the samples are different
-            % H  -  1/0 : outcome of the frequentist hypothesis test.
-            % pValue - p value of the frequentist hypothesis test
+            % p     - p value of the frequentist hypothesis test
             % CI    - Confidence interval for the true mean of X
             % stats - Structure with .tstat, .df,resulting from the traditional test.
             %
@@ -467,11 +470,11 @@ classdef bayesFactor < handle
             if isempty(p.Results.stats)
                 % Calculate frequentist from the X and Y data
                 tail = p.Results.tail;
-                [H,pValue,CI,stats] = ttest2(X,Y,'alpha',p.Results.alpha,'tail',tail);
+                [~,p,CI,stats] = ttest2(X,Y,'alpha',p.Results.alpha,'tail',tail);
                 nX = numel(X);
                 nY = numel(Y);
                 statsForBf = stats;
-                statsForBf.p = pValue;
+                statsForBf.p = p;
                 statsForBf.N = nX*nY/(nX+nY);
                 statsForBf.df = nX+nY-2;
                 statsForBf.tail = tail;
@@ -486,12 +489,12 @@ classdef bayesFactor < handle
         
         
         
-        function [bf10,H,pValue,CI,stats] = ttest(X,varargin)
-            % function [bf10,H,pValue,CI,stats] = ttest(X,Y,varargin)  - paired
-            % function [bf10,H,pValue,CI,stats] = ttest(X,varargin)    - one sample
-            % function [bf10,H,pValue,CI,stats] = ttest(X,M,varargin)   -one sample,non-zero mean
+        function [bf10,pValue,CI,stats] = ttest(X,varargin)
+            % function [bf10,p,CI,stats] = ttest(X,Y,varargin)  - paired
+            % function [bf10,p,CI,stats] = ttest(X,varargin)    - one sample
+            % function [bf10,p,CI,stats] = ttest(X,M,varargin)   -one sample,non-zero mean
             %
-            % Calculates JZS Bayes Factor for a one-sample or paired T-test.
+            % Calculates Bayes Factor for a one-sample or paired T-test.
             %
             % X = single sample observations  (a column vector)
             % Y = paired observations (column vector) or a scalar mean to compare the samples in X to.
@@ -507,8 +510,7 @@ classdef bayesFactor < handle
             % OUTPUT
             % bf10 - The Bayes Factor for the hypothesis that the mean is different
             %           from zero
-            % H  -  1/0 : outcome of the frequentist hypothesis test.
-            % pValue - p value of the frequentist hypothesis test
+            % p - p value of the frequentist hypothesis test
             % CI    - Confidence interval for the true mean of X
             % stats - Structure with .tstat, .df,
             %
@@ -540,7 +542,7 @@ classdef bayesFactor < handle
             if isempty(p.Results.stats)
                 % Calculate frequentist from the X and Y data
                 tail = p.Results.tail;
-                [H,pValue,CI,stats] = ttest(X,Y,'alpha',p.Results.alpha,'tail',tail);
+                [~,pValue,CI,stats] = ttest(X,Y,'alpha',p.Results.alpha,'tail',tail);
                 T = stats.tstat;
                 df = stats.df;
                 N = numel(X);
@@ -552,9 +554,8 @@ classdef bayesFactor < handle
                 pValue = p.Results.stats.p;
                 tail  = p.Results.stats.tail;
                 N = p.Results.stats.N;
+                CI = [NaN NaN];
             end
-            
-            
             
             % Use the formula from Rouder 2009
             r = p.Results.scale;
@@ -571,47 +572,55 @@ classdef bayesFactor < handle
                 case {'left','right'}
                     % Adjust the BF using hte p-value as an estimate for the posterior
                     % (Morey & Wagenmakers, Stats and Prob Letts. 92 (2014):121-124.
-                    bf10 = 2*(1-pValue)*bf10;
+                    bf10 = 2*(1-p)*bf10;
             end
         end
         
-        function bf10 = binotest(k,n,p)           
+        function [bf10,p,pHat] = binotest(k,n,p)
             % Bayes factor for binomial test with k successes, n trials and base probability p.
-            % INPUT 
+            % INPUT
             %  k - number of successes
             %  n - number of draws
-            %  p - true binomial probabiliy 
+            %  p - true binomial probabiliy
             % OUTPUT
             % bf - Bayes Factor representing the evidence that this n/k
             % could result from random draws with p (BF>1) or not (BF<1)
-            
+            % p - p-value of a traditional test
+            % pHat - esttimae of the binomial probablity
             
             % Code from Sam Schwarzkopf
             F = @(q,k,n,p) nchoosek(n,k) .* q.^k .* (1-q).^(n-k);
             bf01 = (nchoosek(n,k) .* p.^k .* (1-p).^(n-k)) / integral(@(q) F(q,k,n,p),0,1);
             bf10 = 1/bf01;
+            
+            if nargout>1
+                % Traditional tests
+                pHat = binofit(k,n,0.05);
+                p = 1-binocdf(k,n,p);
+            end
+            
         end
         
         
         function [bf10,r,p] = corr(arg1,arg2)
             % Calculate the Bayes Factor for Pearson correlation between two
-            % variables. 
+            % variables.
             % INPUT
             % (x,y)  - two vectors of equal length.
             % OR
-            % (r,b)  - the correlation and number of samples
+            % (r,n)  - the correlation and number of samples
             %
             % OUTPUT
             % bf10 = the Bayes Factor for the hypothesis that r is differnt
             %           from zero (two-tailed).
             % r - the correlation
-            % p - the tradiational p-value (only returned if x,y are
-            %       provided).
-            % 
+            % p - the tradiational p-value based on Fisher-transformed
+            %
             if isscalar(arg1) && isscalar(arg2)
                 r= arg1;
                 n= arg2;
-            else                
+            else
+                x=arg1;y=arg2;
                 [r,p] = corr(x,y,'type','pearson');
                 n=numel(x);
             end
@@ -619,6 +628,30 @@ classdef bayesFactor < handle
             % Code from Sam Schwarzkopf
             F = @(g,r,n) exp(((n-2)./2).*log(1+g)+(-(n-1)./2).*log(1+(1-r.^2).*g)+(-3./2).*log(g)+-n./(2.*g));
             bf10 = sqrt((n/2)) / gamma(1/2) * integral(@(g) F(g,r,n),0,Inf);
+            
+            if nargout>1
+                % Compute classical stats too
+                t = r.*sqrt((n-2)./(1-r.^2));
+                p = 2*tcdf(-abs(t),n-2);
+            end
+        end
+    end
+    
+    %% Hide some of the handle class member functions for ease of use.
+    methods (Hidden=true)
+        function notify(o)
+        end
+        function addlistener(o)
+        end
+        function findobj(o)
+        end
+        function findprop(o)
+        end
+        function listener(o)
+        end
+        
+        
+        
         
     end
 end
