@@ -98,15 +98,15 @@ bf01 =
 
     9.8621
 
-</pre><p>Which means that there is strong evidence (BF&gt;6) that there was no change in grades.</p><p><b>ANOVA</b></p><p>Rouder et al 2012 show data for 10 subjects performing a visual detection task. The targets vary in orientation and spatial frequency. These data are stored in table (data) in rouder2012Data.</p><pre class="codeinput"><span class="comment">% Load the table:</span>
+</pre><p>Which means that there is strong evidence (BF&gt;6) that there was no change in grades.</p><p><b>ANOVA</b></p><p>Rouder et al 2012 show data for 10 subjects performing a visual detection task. The targets vary in orientation and spatial frequency. These data are stored in table (data) in rouder2012Data.</p><p>The ANOVA function uses Monte Carlo Integration with parameters that are set in the bayesFactor class. Therefore we first need to construct an instance of the class, and then use that to call linearMixedModel (as opposed to other statistical function such as <tt>ttest</tt> ,| ttest2| , and <tt>corr</tt>, which can be called from the class itself (they are <tt>Static</tt> member functions):</p><pre class="codeinput">bf= bayesFactor; <span class="comment">% Need an instance of the bayesFactor class for ANOVA.</span>
+<span class="comment">% Load the data table:</span>
 load <span class="string">rouder2012Data</span>
 <span class="comment">% Analyze full model (linear effects of frequency and</span>
 <span class="comment">% orientation plus their interaction)</span>
-bf= bayesFactor; <span class="comment">% Create an instance of the bayesFactor class.</span>
 [bfFull,modelFull] = bf.linearMixedModel(data,<span class="string">'rt~ori*freq'</span>);
-</pre><p>The <tt>modelFull</tt> is a LinearModel from the Matlab Statistics toolbox. It has some handy methods that allow us to view the data and the effects The ANOVA table shows an effect of ori <tt>(F(1,36) = 17, p= 0.00002)</tt></p><pre class="codeinput">modelFull.anova
+</pre><p>The <tt>modelFull</tt> is a LinearModel from the Matlab Statistics toolbox. It has some handy methods that allow us to view the data and the effects The ANOVA table and the firgure show a main effect of <tt>ori</tt></p><pre class="codeinput">modelFull.anova
 figure;
-plotEffects(modelFull)
+plotEffects(modelFull);<span class="comment">% Show main effects with error bars</span>
 </pre><pre class="codeoutput">
 ans =
 
@@ -124,19 +124,19 @@ ans =
 </pre><pre class="codeoutput">
 bfFull =
 
-   12.3771
+   12.4738
 
-</pre><p>To specifically look at the evidence for a main effect of orientation, we need to compare the Bayes Factor of the full model to a restructed model in which everything except the main effect of orientation is kept.</p><pre class="codeinput">bfRestricted  =   bf.linearMixedModel(data,<span class="string">'rt~freq +ori:freq'</span>);  <span class="comment">% Keep main of freq and ori:freq interaction.</span>
-</pre><p>The evidence for the main effect is the ratio of the Bayes Factors</p><pre class="codeinput">bfMain = bfFull/bfRestricted
+</pre><p>To specifically look at the evidence for a main effect of orientation, we need to compare the Bayes Factor of the full model to a restricted model in which everything except the main effect of orientation is kept.</p><pre class="codeinput">bfRestricted  =   bf.linearMixedModel(data,<span class="string">'rt~freq +ori:freq'</span>);  <span class="comment">% Keep main of freq and ori:freq interaction.</span>
+</pre><p>The evidence for the main effect is the ratio of the Bayes Factors.</p><pre class="codeinput">bfMain = bfFull/bfRestricted
 </pre><pre class="codeoutput">
 bfMain =
 
-  179.7524
+  181.1561
 
-</pre><p>From these</p><h2 id="12">Figures from Rouder et al. 2012 (1)</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al paper. To test the package, I recreated some of the figures in their publication. The details are in <tt>rouderFigures</tt>, here I just show the results :</p><p>Figure 2 compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput"><span class="comment">%rouderFigures(2);</span>
-</pre><p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput"><span class="comment">%rouderFigures(4,100); % Use 100 bootstrap sets .</span>
-</pre><p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput"><span class="comment">%rouderFigures(5);</span>
-</pre><h2 id="15">References</h2><p>The mathematical underpinning of these tests can be found in the following papers:</p><div><ol><li>Rouder, J. N., Morey, R. D., Speckman, P. L. &amp; Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356&#8211;374 (2012).</li><li>Kass, R. E. &amp; Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733&#8211;795 (1995).</li><li>Morey, R. D. &amp; Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121&#8211;124 (2014).</li></ol></div><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
+</pre><p>The evidence is overwhelmingly in favor of a main effect of orientation.</p><h2 id="12">Figures from Rouder et al. 2012 (1)</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al paper. To test the package, I recreated some of the figures in their publication. The details are in <tt>rouderFigures</tt>, here I just show the results :</p><p>Figure 2 compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput">rouderFigures(2);
+</pre><img vspace="5" hspace="5" src="index_02.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput">rouderFigures(4,100); <span class="comment">% Use 100 bootstrap sets .</span>
+</pre><img vspace="5" hspace="5" src="index_03.png" alt=""> <p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput">rouderFigures(5);
+</pre><img vspace="5" hspace="5" src="index_04.png" alt=""> <h2 id="15">References</h2><p>The mathematical underpinning of these tests can be found in the following papers:</p><div><ol><li>Rouder, J. N., Morey, R. D., Speckman, P. L. &amp; Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356&#8211;374 (2012).</li><li>Kass, R. E. &amp; Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733&#8211;795 (1995).</li><li>Morey, R. D. &amp; Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121&#8211;124 (2014).</li></ol></div><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
 ##### SOURCE BEGIN #####
 %% Bayes Factor 
 % This is a Matlab class to run Bayes Factor analysis. 
@@ -199,22 +199,30 @@ bf01 = 1/bf10
 % Rouder et al 2012 show data for 10 subjects performing a visual detection
 % task. The targets vary in orientation and spatial frequency. These data
 % are stored in table (data) in rouder2012Data.
+%
+% The ANOVA function uses Monte Carlo Integration with parameters that are 
+% set in the bayesFactor class. Therefore we first need to construct an 
+% instance of the class, and then use that to call linearMixedModel (as
+% opposed to other statistical function such as |ttest| ,| ttest2| , and |corr|,
+% which can be called from the class itself (they are |Static| member
+% functions):
 
-% Load the table: 
+bf= bayesFactor; % Need an instance of the bayesFactor class for ANOVA. 
+% Load the data table: 
 load rouder2012Data
 % Analyze full model (linear effects of frequency and
 % orientation plus their interaction) 
-bf= bayesFactor; % Create an instance of the bayesFactor class. 
 [bfFull,modelFull] = bf.linearMixedModel(data,'rt~ori*freq');
 
 %%
 % The |modelFull| is a LinearModel from the Matlab Statistics toolbox.
 % It has some handy methods that allow us to view the data and the
 % effects
-% The ANOVA table shows an effect of ori |(F(1,36) = 17, p= 0.00002)|
+% The ANOVA table and the firgure show a main effect of |ori| 
+
 modelFull.anova
 figure;
-plotEffects(modelFull)
+plotEffects(modelFull);% Show main effects with error bars
 
 %%
 % The Bayes Factor shows that the Full model is better than the Null model
@@ -222,18 +230,17 @@ plotEffects(modelFull)
 bfFull
 %%
 % To specifically look at the evidence for a main effect of orientation, we
-% need to compare the Bayes Factor of the full model to a restructed model
+% need to compare the Bayes Factor of the full model to a restricted model
 % in which everything except the main effect of orientation is kept.
 
 bfRestricted  =   bf.linearMixedModel(data,'rt~freq +ori:freq');  % Keep main of freq and ori:freq interaction.
 
 %% 
-% The evidence for the main effect is the ratio of the Bayes Factors
+% The evidence for the main effect is the ratio of the Bayes Factors. 
 bfMain = bfFull/bfRestricted
-
-
 %%
-% From these 
+% The evidence is overwhelmingly in favor of a main effect of orientation.
+
 
 
 %% Figures from Rouder et al. 2012 (1)
@@ -243,13 +250,13 @@ bfMain = bfFull/bfRestricted
 %
 % Figure 2 compares critical T-values for a traditional t-test with a Bayes
 % Factor analysis.
-%rouderFigures(2); 
+rouderFigures(2); 
 %%
 % Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.
-%rouderFigures(4,100); % Use 100 bootstrap sets . 
+rouderFigures(4,100); % Use 100 bootstrap sets . 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
-%rouderFigures(5); 
+rouderFigures(5); 
 
 
 %% References
