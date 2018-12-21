@@ -71,17 +71,12 @@ classdef bayesFactor < handle
             p.addParameter('treatAsRandom',{});
             p.parse(varargin{:});
             
-            formula = classreg.regr.LinearMixedFormula(formula);
-            if ~isempty(formula.RELinearFormula)
-                 error('Sorry, grouping has not been implemented yet.)');
-            else
-                feFormula = formula.FELinearFormula;
-                isMain= ~cellfun(@(x) (contains(x,'(')|| contains(x,':')),feFormula.TermNames);
-                mainEffects  =feFormula.TermNames(isMain)';
-                isInteraction= cellfun(@(x) (contains(x,':')),feFormula.TermNames);
-                interactions = feFormula.TermNames(isInteraction)';
-                response = formula.ResponseName;
-            end
+            f = classreg.regr.LinearFormula(formula);
+            isMain= ~cellfun(@(x) (contains(x,'(')|| contains(x,':')),f.TermNames);
+            mainEffects  =f.TermNames(isMain)';
+            isInteraction= cellfun(@(x) (contains(x,':')),f.TermNames);
+            interactions = f.TermNames(isInteraction)';
+                response = f.ResponseName;
             nrMainEffects =numel(mainEffects);
             nrInteractions = numel(interactions);
             allTerms = cat(2,mainEffects,interactions);
@@ -157,6 +152,8 @@ classdef bayesFactor < handle
             
             if nargout>1
                 % Traditional
+                model  = fitlm(tbl,formula);
+                aov = anova(model);
             end
         end
         
