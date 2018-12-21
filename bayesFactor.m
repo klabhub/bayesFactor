@@ -31,7 +31,7 @@ classdef bayesFactor < handle
             
         end
         
-        function [bf10,model,aov] = linearMixedModel(o,tbl,formula,varargin)
+        function [bf10,model] = linearMixedModel(o,tbl,formula,varargin)
             % Analyze table data with a linear mixed effects model.
             %
             % INPUT
@@ -152,8 +152,7 @@ classdef bayesFactor < handle
             
             if nargout>1
                 % Traditional
-                model  = fitlm(tbl,formula);
-                aov = anova(model);
+                model  = fitlm(tbl,formula);              
             end
         end
         
@@ -520,7 +519,11 @@ classdef bayesFactor < handle
                     parms = varargin;
                 else
                     % X and Y specified
-                    parms = varargin{2:end};
+                    if numel(varargin)>1
+                        parms = varargin{2:end};
+                    else
+                        parms = {};
+                    end
                     Y  =varargin{1};
                 end
             else
@@ -636,19 +639,15 @@ classdef bayesFactor < handle
     
     %% Hide some of the handle class member functions for ease of use.
     methods (Hidden=true)
-        function notify(o)
+        function notify(~)
         end
-        function addlistener(o)
+        function addlistener(~)
         end
-        function findobj(o)
+        function findobj(~)
         end
-        function findprop(o)
+        function findprop(~)
         end
-        function listener(o)
-        end
-        
-        
-        
-        
+        function listener(~)
+        end        
     end
 end

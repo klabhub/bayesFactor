@@ -19,24 +19,17 @@ if nargin<2
         figs = [4 5];
     end
 end
-%Extracted data from Figure 5 and put into a table
-y = [0.7 0.71 0.68 0.57 0.6 0.68 0.57 0.67 0.62 0.75
-    0.53 0.52 0.82 0.78 0.6 0.67 0.76 0.65 0.49 0.63
-    0.87 0.72 0.85 0.82 0.81 0.88 0.84 0.94 0.94 0.68
-    0.97 0.9 0.67 0.66 0.6 0.61 1.07 0.89 0.71 0.6]';
-[ nrSubjects,nrConditions]= size(y);
-data = table(y(:),[true(2*nrSubjects,1);false(2*nrSubjects,1)],repmat([true(nrSubjects,1);false(nrSubjects,1)],[2 1]),repmat((1:nrSubjects)',[nrConditions 1]),'VariableNames',{'rt','ori','freq','subject'});
 
 % Quick simulation illustrating the issue with having too many random
 % effects and interactions.
 if any(figs==5)
-    rouderFigure5(data);
+    rouderFigure5;
 end
 % This will take a while as it bootsraps the BF for different effect sizes.
 % set nrSets =10 for a quick and dirty check, 1000 to really run what
 % Rouder et al did.
 if any(figs==4)
-    rouderFigure4(data,nrSets);
+    rouderFigure4(nrSets);
 end
 
 if any(figs==2)
@@ -45,9 +38,10 @@ end
 end
 
 
-function rouderFigure5(data)
+function rouderFigure5
 % Runs the simulations of Rouder et al. 2009 in Figure 5, to illustrate the
 % differences between fixed and random effects.
+load rouder2012Data
 bf= bayesFactor;
 % Both ori and freq fixed
 bfFullFixed= bf.linearMixedModel(data,'rt~ori*freq');
@@ -108,10 +102,11 @@ ylabel 'Bayes Factor vs. Null Model'
 
 end
 %% Rouder figure 4
-function rouderFigure4(data,nrSets)
+function rouderFigure4(nrSets)
 % Runs the simulations of Rouder et al. 2009 in Figure 4.
 % This basically shows the ability to extract Main and Interaction effects
 % in a 2-way ANOVA.
+load rouder2012Data
 bf=bayesFactor;
 effects = [0   0   0
     0.2 0   0

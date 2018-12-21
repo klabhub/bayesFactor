@@ -66,23 +66,83 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 
 
 
-  </style></head><body><div class="content"><h1>Bayes Factor</h1><!--introduction--><p>This is a Matlab class to run Bayes Factor analysis. The code was written by Bart Krekelberg (<a href="mailto:bart@rutgers.edu">bart@rutgers.edu</a>) with some code taken from Sam Schwarzkopf's code and with inspriation from the R package by Richard Morey.</p><p>The mathematical underpinning of these tests can be found in the following papers:</p><div><ol><li>Rouder, J. N., Morey, R. D., Speckman, P. L. &amp; Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356&#8211;374 (2012).</li><li>Kass, R. E. &amp; Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733&#8211;795 (1995).</li><li>Morey, R. D. &amp; Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121&#8211;124 (2014).</li></ol></div><p>Currently the following statistical tests have been implemented</p><div><ul><li>One sample t-test  (<tt>ttest</tt>)</li><li>Two sample t-test (<tt>ttest2</tt>)</li><li>N-Way Anova with fixed and random effects  (<tt>linearMixedModel</tt>)</li><li>Pearson Correlation  (<tt>corr</tt>)</li><li>Binomial Test  ( <tt>binom</tt> )</li></ul></div><p>For convenience, each of these tests also returns the results of a traditional, frequentist, test (i.e. p-values etc.)</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Installation &amp; Dependencies</a></li><li><a href="#2">Examples</a></li><li><a href="#3">Figures from Rouder et al. 2012 (1)</a></li></ul></div><h2 id="1">Installation &amp; Dependencies</h2><p>The standard statistical analysis (and some utility functions) require the Statistics and Machine Learning Matlab toolbox.</p><p>All code is defined in a single class definition file (bayesFactor.m). Installation only requires adding the directory that contains this file to the Matlab search path. The <tt>installBayesFactor</tt> function does this for you.</p><h2 id="2">Examples</h2><h2 id="3">Figures from Rouder et al. 2012 (1)</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al paper. To test the package, I recreated some of the figures in their publication. The details are in <tt>rouderFigures</tt>, here I just show the results :</p><p>Figure 2 compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput">rouderFigures(2);
-</pre><img vspace="5" hspace="5" src="index_01.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput"><span class="comment">%rouderFigures(4,10); % Use 100 bootstrap sets .</span>
-</pre><p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput">rouderFigures(5);
-</pre><img vspace="5" hspace="5" src="index_02.png" alt=""> <p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
+  </style></head><body><div class="content"><h1>Bayes Factor</h1><!--introduction--><p>This is a Matlab class to run Bayes Factor analysis. The code was written by Bart Krekelberg (<a href="mailto:bart@vision.rutgers.edu">bart@vision.rutgers.edu</a>) with some code taken from Sam Schwarzkopf's code and with inspiration from the R package by Richard Morey.</p><p>Currently the following statistical tests have been implemented</p><div><ul><li>One sample t-test  (<tt>ttest</tt>)</li><li>Two sample t-test (<tt>ttest2</tt>)</li><li>N-Way Anova with fixed and random effects  (<tt>linearMixedModel</tt>)</li><li>Pearson Correlation  (<tt>corr</tt>)</li><li>Binomial Test  ( <tt>binom</tt> )</li></ul></div><p>For convenience, each of these tests also returns the results of a traditional, frequentist, test (i.e. p-values etc.)</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Installation &amp; Dependencies</a></li><li><a href="#2">Examples</a></li><li><a href="#12">Figures from Rouder et al. 2012 (1)</a></li><li><a href="#15">References</a></li></ul></div><h2 id="1">Installation &amp; Dependencies</h2><p>The standard statistical analysis (and some utility functions) require the Statistics and Machine Learning Matlab toolbox.</p><p>All code is defined in a single class definition file (bayesFactor.m). Installation only requires adding the directory that contains this file to the Matlab search path. The <tt>installBayesFactor</tt> function does this for you.</p><h2 id="2">Examples</h2><p><b>Single sample T-Test</b></p><pre class="codeinput">load <span class="string">stockreturns</span>
+<span class="comment">% Analyze the returns of stock #3:</span>
+<span class="comment">% Use the class name bayesFactor to call the ttest:</span>
+[bf10,p] = bayesFactor.ttest(stocks(:,3))
+</pre><pre class="codeoutput">
+bf10 =
+
+    2.7158
+
+
+p =
+
+    0.0106
+
+</pre><p>The p-value of the traditional test shows that the stock return was significantly different from zero, but the Bayes Factor shows that the evidence is weak  (BF10&lt;3).</p><p><b>Paired T-Test</b> We are comparing student grades on two exams and want to know whether the grades changed from exam 1 to exam 2.</p><pre class="codeinput">load <span class="string">examgrades</span>
+[bf10,p] = bayesFactor.ttest(grades(:,1),grades(:,2))
+</pre><pre class="codeoutput">
+bf10 =
+
+    0.1014
+
+
+p =
+
+    0.9805
+
+</pre><p>The T-test tells us that the Null hypotheses (grades changed) cannot be rejected. The Bayes Factor is more informative, we can convert it to the Bayes Factor for the absence of an effect:</p><pre class="codeinput">bf01 = 1/bf10
+</pre><pre class="codeoutput">
+bf01 =
+
+    9.8621
+
+</pre><p>Which means that there is strong evidence (BF&gt;6) that there was no change in grades.</p><p><b>ANOVA</b></p><p>Rouder et al 2012 show data for 10 subjects performing a visual detection task. The targets vary in orientation and spatial frequency. These data are stored in table (data) in rouder2012Data.</p><pre class="codeinput"><span class="comment">% Load the table:</span>
+load <span class="string">rouder2012Data</span>
+<span class="comment">% Analyze full model (linear effects of frequency and</span>
+<span class="comment">% orientation plus their interaction)</span>
+bf= bayesFactor; <span class="comment">% Create an instance of the bayesFactor class.</span>
+[bfFull,modelFull] = bf.linearMixedModel(data,<span class="string">'rt~ori*freq'</span>);
+</pre><p>The <tt>modelFull</tt> is a LinearModel from the Matlab Statistics toolbox. It has some handy methods that allow us to view the data and the effects The ANOVA table shows an effect of ori <tt>(F(1,36) = 17, p= 0.00002)</tt></p><pre class="codeinput">modelFull.anova
+figure;
+plotEffects(modelFull)
+</pre><pre class="codeoutput">
+ans =
+
+  4&times;5 table
+
+                  SumSq      DF     MeanSq         F         pValue  
+                _________    __    _________    _______    __________
+
+    ori           0.22952     1      0.22952     16.998    0.00021032
+    freq         0.014823     1     0.014823     1.0977       0.30175
+    ori:freq    0.0081225     1    0.0081225    0.60153       0.44306
+    Error         0.48611    36     0.013503                         
+
+</pre><img vspace="5" hspace="5" src="index_01.png" alt=""> <p>The Bayes Factor shows that the Full model is better than the Null model (i.e. intercept only model)</p><pre class="codeinput">bfFull
+</pre><pre class="codeoutput">
+bfFull =
+
+   12.3771
+
+</pre><p>To specifically look at the evidence for a main effect of orientation, we need to compare the Bayes Factor of the full model to a restructed model in which everything except the main effect of orientation is kept.</p><pre class="codeinput">bfRestricted  =   bf.linearMixedModel(data,<span class="string">'rt~freq +ori:freq'</span>);  <span class="comment">% Keep main of freq and ori:freq interaction.</span>
+</pre><p>The evidence for the main effect is the ratio of the Bayes Factors</p><pre class="codeinput">bfMain = bfFull/bfRestricted
+</pre><pre class="codeoutput">
+bfMain =
+
+  179.7524
+
+</pre><p>From these</p><h2 id="12">Figures from Rouder et al. 2012 (1)</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al paper. To test the package, I recreated some of the figures in their publication. The details are in <tt>rouderFigures</tt>, here I just show the results :</p><p>Figure 2 compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput"><span class="comment">%rouderFigures(2);</span>
+</pre><p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput"><span class="comment">%rouderFigures(4,100); % Use 100 bootstrap sets .</span>
+</pre><p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput"><span class="comment">%rouderFigures(5);</span>
+</pre><h2 id="15">References</h2><p>The mathematical underpinning of these tests can be found in the following papers:</p><div><ol><li>Rouder, J. N., Morey, R. D., Speckman, P. L. &amp; Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356&#8211;374 (2012).</li><li>Kass, R. E. &amp; Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733&#8211;795 (1995).</li><li>Morey, R. D. &amp; Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121&#8211;124 (2014).</li></ol></div><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
 ##### SOURCE BEGIN #####
 %% Bayes Factor 
 % This is a Matlab class to run Bayes Factor analysis. 
-% The code was written by Bart Krekelberg (bart@rutgers.edu) with some code
-% taken from Sam Schwarzkopf's code and with inspriation from the R package
+% The code was written by Bart Krekelberg (bart@vision.rutgers.edu) with some code
+% taken from Sam Schwarzkopf's code and with inspiration from the R package
 % by Richard Morey.
-%
-% The mathematical underpinning of these tests can be found in the
-% following papers:
-%
-% # Rouder, J. N., Morey, R. D., Speckman, P. L. & Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356–374 (2012).
-% # Kass, R. E. & Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733–795 (1995).
-% # Morey, R. D. & Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121–124 (2014).
 %
 % Currently the following statistical tests have been implemented
 %
@@ -106,6 +166,76 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 %
 %% Examples
 % 
+% *Single sample T-Test*
+load stockreturns
+% Analyze the returns of stock #3:
+% Use the class name bayesFactor to call the ttest:
+[bf10,p] = bayesFactor.ttest(stocks(:,3))
+
+%% 
+% The p-value of the traditional test shows that the stock return was
+% significantly different from zero, but the Bayes Factor shows that the
+% evidence is weak  (BF10<3).
+
+%%
+% *Paired T-Test*
+% We are comparing student grades on two exams and want to know whether 
+% the grades changed from exam 1 to exam 2.
+
+load examgrades
+[bf10,p] = bayesFactor.ttest(grades(:,1),grades(:,2))
+
+%%
+% The T-test tells us that the Null hypotheses (grades changed) cannot be
+% rejected. The Bayes Factor is more informative, we can convert it to the
+% Bayes Factor for the absence of an effect:
+bf01 = 1/bf10
+%%
+% Which means that there is strong evidence (BF>6) that there was no change in
+% grades.
+%
+% *ANOVA*
+%
+% Rouder et al 2012 show data for 10 subjects performing a visual detection
+% task. The targets vary in orientation and spatial frequency. These data
+% are stored in table (data) in rouder2012Data.
+
+% Load the table: 
+load rouder2012Data
+% Analyze full model (linear effects of frequency and
+% orientation plus their interaction) 
+bf= bayesFactor; % Create an instance of the bayesFactor class. 
+[bfFull,modelFull] = bf.linearMixedModel(data,'rt~ori*freq');
+
+%%
+% The |modelFull| is a LinearModel from the Matlab Statistics toolbox.
+% It has some handy methods that allow us to view the data and the
+% effects
+% The ANOVA table shows an effect of ori |(F(1,36) = 17, p= 0.00002)|
+modelFull.anova
+figure;
+plotEffects(modelFull)
+
+%%
+% The Bayes Factor shows that the Full model is better than the Null model
+% (i.e. intercept only model)
+bfFull
+%%
+% To specifically look at the evidence for a main effect of orientation, we
+% need to compare the Bayes Factor of the full model to a restructed model
+% in which everything except the main effect of orientation is kept.
+
+bfRestricted  =   bf.linearMixedModel(data,'rt~freq +ori:freq');  % Keep main of freq and ori:freq interaction.
+
+%% 
+% The evidence for the main effect is the ratio of the Bayes Factors
+bfMain = bfFull/bfRestricted
+
+
+%%
+% From these 
+
+
 %% Figures from Rouder et al. 2012 (1)
 % Much of the mathematical basis for this package is developed in the Rouder et al
 % paper. To test the package, I recreated some of the figures in their publication. 
@@ -113,12 +243,22 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 %
 % Figure 2 compares critical T-values for a traditional t-test with a Bayes
 % Factor analysis.
-rouderFigures(2); 
+%rouderFigures(2); 
 %%
 % Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.
-%rouderFigures(4,10); % Use 100 bootstrap sets . 
+%rouderFigures(4,100); % Use 100 bootstrap sets . 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
-rouderFigures(5); 
+%rouderFigures(5); 
+
+
+%% References
+% The mathematical underpinning of these tests can be found in the
+% following papers:
+%
+% # Rouder, J. N., Morey, R. D., Speckman, P. L. & Province, J. M. Default Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356–374 (2012).
+% # Kass, R. E. & Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733–795 (1995).
+% # Morey, R. D. & Wagenmakers, E. J. Simple relation between Bayesian order-restricted and point-null hypothesis tests. Stat. Probab. Lett. 92, 121–124 (2014).
+
 ##### SOURCE END #####
 --></body></html>
