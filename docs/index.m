@@ -33,3 +33,17 @@
 %
 %% Examples
 % 
+%% Figures from Rouder et al. 2012 (1)
+% Much of the mathematical basis for this package is developed in the Rouder et al
+% paper. To test the package, I recreated some of the figures in their publication. 
+% The details are in |rouderFigures|, here I just show the results :
+%
+% Figure 2 compares critical T-values for a traditional t-test with a Bayes
+% Factor analysis.
+rouderFigures(2); 
+%%
+% Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.
+rouderFigures(4,10); % Use 100 bootstrap sets . 
+%%
+% Figure 5 illustrates the influence of fixed and random effects
+rouderFigures(5); 
