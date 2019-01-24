@@ -14,7 +14,7 @@ function rouderFigures(figs,nrSets)
 % BK - 2018
 
 if nargin<2
-    nrSets =10; % WQuick and dirty.
+    nrSets =10; % Quick and dirty.
     if nargin <1
         figs = [4 5];
     end
