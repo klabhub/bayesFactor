@@ -30,7 +30,7 @@ classdef bayesFactor < handle
             % Constructor. Nothing to do.
             
         end
-       
+        
         function [results] = designAnalysis(o,varargin)
             % Perform a Bayes Factor Design Analysis.
             %  This function will simulate data sets with a given effect
@@ -53,22 +53,30 @@ classdef bayesFactor < handle
             %                   considered sufficient and the threshold above
             %                  which the evidence for H1 is considered sufficient. [1/6 6].
             % nrMC  =   The number of monte carlo simulations to run [10000]
-            % test  = Which statistical test to use. TTEST, TTEST2,RMANOVA            
+            % test  = Which statistical test to use. TTEST, TTEST2,RMANOVA
             % effectSize = The (expected) effectSize under H1. The "units" differ per test:
             %                   TTEST,TTEST2: expressed as fraction of the standard deviation. [0.5]
             %                   LINEARMIXEDMODEL: expected coefficients in
             %                   the linear model in the order corresponding
-            %                   to the design matrix
+            %                   to the design matrix.
+            %                   To specify a distribution of effectSizes,
+            %                   use an anonymouys function. For instance,
+            %                   for an effect size with a mean of 0.5 and stdev of 0.1,
+            %                   pass @(N) (0.5_0.1*randn([N 1]])
             % designMatrix = The design matrix for a linear mixed model.
             %
             % tail = Tail for TTest/TTest2. [both]
             % scale = SCale of the Cauchy prior [sqrt(2)/2].
+            % pSuccess = The target probability of "success" (reaching the
+            % evidence boundary). [0.9]
+            % linearModel = The linear model to simulate. Only used
+            % for ANOVA test
             % plot = Toggle to show graphical output as in Schoenbrodt &
             %                   Wagenmakers
             %
-            % 
+            %
             % To add your own analysis, but reuse the looping/graphing from
-            % this funcition, set 'test' to 'SPECIAL' and provide 
+            % this funcition, set 'test' to 'SPECIAL' and provide
             % 'dataFun', functions that generate data
             % based on an effect size and N, and 'bfFun', a function that
             % cacluates the bayesFactor based on the output of the dataFun.
@@ -138,7 +146,7 @@ classdef bayesFactor < handle
             p.addParameter('tail','both');
             p.addParameter('scale',sqrt(2)/2);
             p.addParameter('plot',true);
-            p.addParameter('bfFun',[]);  % For 'test'=='SPECIAL' - specify your own bfFun and dataFun here. 
+            p.addParameter('bfFun',[]);  % For 'test'=='SPECIAL' - specify your own bfFun and dataFun here.
             p.addParameter('dataFun',[]);
             p.parse(varargin{:});
             results.H1 = struct('N',struct('min',NaN,'median',NaN,'all',[],'pMax',NaN),'bf',struct('all',[],'median',nan),'pFalse',[]);
@@ -154,9 +162,9 @@ classdef bayesFactor < handle
                 case 'TTEST2'
                     % Two sample ttest
                     dataFun = @(effectSize,N) ({-0.5*effectSize + randn([N 1]),0.5*effectSize + randn([N 1])});
-                    bfFun = @(X,Y) bayesFactor.ttest2(X,Y,'alpha',p.Results.alpha,'tail',p.Results.tail,'scale',p.Results.scale);
+                    bfFun = @(X,Y) bayesFactor.ttest2(X,Y,'tail',p.Results.tail,'scale',p.Results.scale);
                 case 'RMANOVA'
-                    %Repeated measures ANOVA                                        
+                    %Repeated measures ANOVA
                     dataFun = @(effectSize,N) o.simulateLinearModel(p.Results.linearModel,effectSize,N);
                     bfFun   = @(X,Y) o.linearModel(X,Y);
                 case 'SPECIAL'
@@ -181,10 +189,16 @@ classdef bayesFactor < handle
                 % subjects but sample htese successively and at each step
                 % test whether the BF is above threshold (and if so,
                 % terminate). Repeat this nrMC times.
+                nFalsePositive = 0;
+                nFalseNegative = 0;                    
                 for j=1:p.Results.nrMC
-                    data  = dataFun(p.Results.effectSize,maxN);
+                    if isa(p.Results.effectSize,'function_handle')
+                        es = p.Results.effectSize(maxN);
+                    else
+                        es = p.Results.effectSize;
+                    end
+                    data  = dataFun(es,maxN);
                     nullData  = dataFun(0,maxN);
-                    nFalseNegative = 0;
                     for i=1:nrN
                         % Sequential sampling for H1 data
                         thisData = cellfun(@(x)(x(1:p.Results.N(i))),data,'UniformOutput',false);
@@ -197,7 +211,6 @@ classdef bayesFactor < handle
                             break;
                         end
                     end
-                    nFalsePositive = 0;
                     for i=1:nrN
                         % Sequential sampling for HO data
                         thisNullData = cellfun(@(x)(x(1:p.Results.N(i))),nullData,'UniformOutput',false);
@@ -235,7 +248,12 @@ classdef bayesFactor < handle
                 % Simualte a regular fixed N design
                 for i =1:nrN
                     for j= 1:p.Results.nrMC
-                        data  = dataFun(p.Results.effectSize,p.Results.N(i));
+                        if isa(p.Results.effectSize,'function_handle')
+                            es = p.Results.effectSize(p.Results.N(i));
+                        else
+                            es = p.Results.effectSize;
+                        end
+                        data  = dataFun(es,p.Results.N(i));
                         results.H1.bf.all(j,i) = bfFun(data{:}); % Collect BF under H1
                         nullData  = dataFun(0,p.Results.N(i));
                         results.H0.bf.all(j,i) = bfFun(nullData{:}); % Collect BF under H0
@@ -275,11 +293,15 @@ classdef bayesFactor < handle
                         if i==0
                             toPlot = results.H1.bf.all;
                             hyp ='H1';
-                            ES = p.Results.effectSize;
+                            if isa(p.Results.effectSize,'function_handle')
+                                es = func2str(p.Results.effectSize);
+                            else
+                                es = num2str(p.Results.effectSize);
+                            end
                         else
                             toPlot = results.H0.bf.all;
                             hyp = 'H0';
-                            ES = 0;
+                            es = '0';
                         end
                         toPlot(toPlot>upperBF) = upperBF;
                         toPlot(toPlot<lowerBF) = lowerBF;
@@ -291,7 +313,7 @@ classdef bayesFactor < handle
                         set(gca,'YScale','Log','YLim',[lowerBF*0.8 upperBF*1.2],'YTick',ticks,'YTickLabels',tickLabels)
                         xlabel 'Sample Size'
                         ylabel 'Bayes Factor (BF_{10})'
-                        title (['Under ' hyp ': Effect Size= ' num2str(ES)]);
+                        title (['Under ' hyp ': Effect Size= ' es]);
                         h1Boundary  = mean(max(toPlot,[],2)>=upperBF);
                         text(min(p.Results.N),1.1*upperBF,sprintf('%d%% stopped at H1 Boundary',round(100*h1Boundary)),'FontWeight','Bold');
                         h0Boundary = mean(min(toPlot,[],2)<=lowerBF);
@@ -317,11 +339,15 @@ classdef bayesFactor < handle
                         if j==0
                             toPlot = results.H1.bf.all;
                             hyp ='H1';
-                            ES = p.Results.effectSize;
+                            if isa(p.Results.effectSize,'function_handle')
+                                es = func2str(p.Results.effectSize);
+                            else
+                                es = num2str(p.Results.effectSize);
+                            end
                         else
                             toPlot = results.H0.bf.all;
                             hyp = 'H0';
-                            ES = 0;
+                            es = '0';
                         end
                         for i=1:nrN
                             subplot(R,C,C*j+i);
@@ -331,7 +357,7 @@ classdef bayesFactor < handle
                             hold on
                             xlabel 'Bayes Factor (BF_{10})'
                             ylabel 'Density'
-                            title([ hyp ': N = ' num2str(p.Results.N(i)) ', Effect Size = ' num2str(ES)]);
+                            title([ hyp ': N = ' num2str(p.Results.N(i)) ', Effect Size = ' es]);
                         end
                     end
                     % Equal x-axes
@@ -361,9 +387,9 @@ classdef bayesFactor < handle
             %  x = a LinearMixedModel from the stats toolbox (created by
             %  fitlme).
             % OR the user can provide a table and a formula
-            %  x = A table 
-            %  y = A Wilkinson notation formula. 
-            % 
+            %  x = A table
+            %  y = A Wilkinson notation formula.
+            %
             % Parm/Value pairs:
             % 'sharedPriors' - Which columns (i.e. factors) in the table should share a
             %                   their prior on their effect size. The default is that
@@ -391,21 +417,21 @@ classdef bayesFactor < handle
                 lm = x;
                 if nargin<=2
                     args = {};
-                else 
+                else
                     args = cat(2,{y},varargin); % Y must be part of the vararing
-                end            
+                end
             elseif isa(x,'table') && ischar(y)  % Specified a table and formula
                 lm = fitlme(x,y);
                 args = varargin;
-            else 
+            else
                 error('bayesFactor.anova requires either a LinearMixedModel or a Table & Formula as its input');
-            end            
+            end
             p=inputParser;
             p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.
             p.addParameter('treatAsRandom',{});
             p.parse(args{:});
             
-                       
+            
             f=lm.Formula;
             if ~isempty(f.GroupingVariableNames)
                 error('Not implemented yet');
@@ -413,7 +439,7 @@ classdef bayesFactor < handle
             
             allTerms = bayesFactor.getAllTerms(lm);
             % Construct the design matrix
-            [X,y] = designMatrix(o,lm,allTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);            
+            [X,y] = designMatrix(o,lm,allTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
             nrAllTerms = numel(allTerms);
             
             % Setup sharing of priors as requested
@@ -433,7 +459,7 @@ classdef bayesFactor < handle
             end
             sharedPriorIx = cell(1,numel(sharedPriors));
             [sharedPriorIx{:}] = deal([]);
-                                
+            
             % Assign groups of effects to use the same prior on effect size.
             soFar  =0;
             if isempty(sharedPriors)
@@ -449,12 +475,12 @@ classdef bayesFactor < handle
                     soFar = soFar+nrInThisTerm;
                 end
             end
-            %% Call the nWayAnova function for the actual analysis         
+            %% Call the nWayAnova function for the actual analysis
             X= [X{:}];
             bf10 = o.nWayAnova(y,X,'sharedPriors',sharedPriorIx);
         end
         
-      
+        
         
         
         
@@ -472,14 +498,14 @@ classdef bayesFactor < handle
             % design arrrag ( e.g. {'ori','freq','ori:freq'} for two mains and an interaction)
             % Parm/Value
             % ZeroSumConstraint -  Toggle to apply the zero sum constraint to
-            %                   each factor (This equates the marginal prior across terms in the 
+            %                   each factor (This equates the marginal prior across terms in the
             %                           factor; see Rouder et al) [true]
             % treatAsRandom  - A cell array of factors which should be
             %               treated as random (i.e. not fixed) effects.
             %               [{}].
             % OUTPUT
             % X = The design matrix [nrObservations nrLevels]
-            % y = The response data 
+            % y = The response data
             % BK - 2019.
             
             p = inputParser;
@@ -516,7 +542,7 @@ classdef bayesFactor < handle
                 X{i} =thisX; % Store for later use
             end
             if nargout>1
-                   y= lm.Variables.(lm.ResponseName);           
+                y= lm.Variables.(lm.ResponseName);
             end
         end
         
@@ -592,7 +618,7 @@ classdef bayesFactor < handle
         end
         
         function out = simulateLinearModel(o,lm,effectSize,N)
-            % Simulate data based on a linear model vector specifying the mean 
+            % Simulate data based on a linear model vector specifying the mean
             % for  each level of each factor and the number of samples to
             % generate.
             % lm = A linearMixedModel that specifies the base model for a
@@ -602,23 +628,23 @@ classdef bayesFactor < handle
             % specify the effectSize as  [a1 a2 b1 b2 b3].
             % N = How many observations to generate. Note that N=1 means
             % one observation for each of the combinations (i.e. 6 for the
-            % example).                       
-             X = designMatrix(o,lm,bayesFactor.getAllTerms(lm),'zeroSumConstraint',false,'treatAsRandom',{});
-             X = [X{:}]; 
-             if numel(effectSize)==1
-                 effectSize = effectSize*ones(1,size(X,2));
-             end
-             if size(X,2) ~= numel(effectSize)
+            % example).
+            X = designMatrix(o,lm,bayesFactor.getAllTerms(lm),'zeroSumConstraint',false,'treatAsRandom',{});
+            X = [X{:}];
+            if numel(effectSize)==1
+                effectSize = effectSize*ones(1,size(X,2));
+            end
+            if size(X,2) ~= numel(effectSize)
                 error('Please specify effect size for the linear model as one coefficient for each column in the deisgn matrix');
-             end
-             y =  repmat(X,[N 1])*effectSize(:)+randn([N*size(X,1) 1]);
-             
-             tbl = table(y,'variablenames',{lm.ResponseName});
-             for i=1:lm.NumPredictors
-                 tbl = addvars(tbl,repmat(lm.Variables.(lm.PredictorNames{i}),[N 1]),'newvariablenames',{lm.PredictorNames{i}});
-             end
-             out = {tbl,char(lm.Formula)};
-        end 
+            end
+            y =  repmat(X,[N 1])*effectSize(:)+randn([N*size(X,1) 1]);
+            
+            tbl = table(y,'variablenames',{lm.ResponseName});
+            for i=1:lm.NumPredictors
+                tbl = addvars(tbl,repmat(lm.Variables.(lm.PredictorNames{i}),[N 1]),'newvariablenames',{lm.PredictorNames{i}});
+            end
+            out = {tbl,char(lm.Formula)};
+        end
     end
     
     %% Helper functions
@@ -814,6 +840,7 @@ classdef bayesFactor < handle
             % Optional Parm/Value pairs:
             % alpha - significance level for the frequentist test. [0.05]
             % tail - 'both','right', or 'left' for two or one-tailed tests [both]
+            %               Note that  'right' means X>Y and 'left' is X<Y
             % scale - Scale of the Cauchy prior on the effect size  [sqrt(2)/2]
             % stats - A struct containing .tstat  , .df , .pvalue .tail and .N - This allows one to
             %               calculate BF10 directly from the results of a standard ttest2 output.
@@ -943,9 +970,15 @@ classdef bayesFactor < handle
             end
             
             % Use the formula from Rouder 2009
+            % This is the formula in that paper, but it does not use the
+            % scale
+            % numerator = (1+T.^2/(N-1)).^(-N/2);
+            % fun  = @(g) ( ((1+N.*g).^-0.5) .* (1+T.^2./((1+N.*g).*(N-1))).^(-N/2) .* (2*pi).^(-1/2) .* g.^(-3/2).*exp(-1./(2*g))  );
+            % This is with scale  (Checked against Morey's R package )
             r = p.Results.scale;
             numerator = (1+T.^2/df).^(-(df+1)/2);
             fun  = @(g) ( ((1+N.*g.*r.^2).^-0.5) .* (1+T.^2./((1+N.*g.*r.^2).*df)).^(-(df+1)/2) .* (2*pi).^(-1/2) .* g.^(-3/2).*exp(-1./(2*g))  );
+            
             % Integrate over g
             bf01 = numerator/integral(fun,0,inf);
             % Return BF10
@@ -957,7 +990,7 @@ classdef bayesFactor < handle
                 case {'left','right'}
                     % Adjust the BF using hte p-value as an estimate for the posterior
                     % (Morey & Wagenmakers, Stats and Prob Letts. 92 (2014):121-124.
-                    bf10 = 2*(1-p)*bf10;
+                    bf10 = 2*(1-pValue)*bf10;
             end
         end
         
@@ -1020,22 +1053,22 @@ classdef bayesFactor < handle
                 p = 2*tcdf(-abs(t),n-2);
             end
         end
-             
+        
         function allTerms = getAllTerms(lm)
             allTerms = lm.CoefficientNames;
-            allTerms(strcmpi(allTerms,'(Intercept)')) = []; % Intercept not neeed           
+            allTerms(strcmpi(allTerms,'(Intercept)')) = []; % Intercept not neeed
             % In the linearmixedmodel the factors have _1 appended in their
             % names. Even without grouping. I remove this here.
             allTerms = cellfun(@(x)(strrep(x,'_1','')),allTerms,'UniformOutput',false);
         end
         
         
-            
+        
     end
     
     %% Hide some of the handle class member functions for ease of use.
     methods (Hidden=true)
-   
+        
         function notify(~)
         end
         function addlistener(~)
