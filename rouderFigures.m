@@ -44,10 +44,10 @@ function rouderFigure5
 load rouder2012Data
 bf= bayesFactor;
 % Both ori and freq fixed
-bfFullFixed= bf.linearMixedModel(data,'rt~ori*freq');
-bfBothFixed= bf.linearMixedModel(data,'rt~ori+freq');
-bfOriFixed= bf.linearMixedModel(data,'rt~ori +ori:freq');
-bfFreqFixed= bf.linearMixedModel(data,'rt~freq+ ori:freq');
+bfFullFixed= bf.anova(data,'rt~ori*freq');
+bfBothFixed= bf.anova(data,'rt~ori+freq');
+bfOriFixed= bf.anova(data,'rt~ori +ori:freq');
+bfFreqFixed= bf.anova(data,'rt~freq+ ori:freq');
 
 bf10  = nan(3,4); % 3 factors (ori,freq,int) and 4 kinds of effects (fixed, mixed, mixed, random)
 bf10(1,1) = bfFullFixed/bfFreqFixed; % Main or int effect of ori
@@ -56,10 +56,10 @@ bf10(3,1) = bfFullFixed/bfBothFixed; % Interaction
 
 
 % Ori fixed, freq random
-bfFullMixed= bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'freq'});
-bfBothMixed= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'freq'});
-bfOriMixed= bf.linearMixedModel(data,'rt~ori +ori:freq','treatAsRandom',{'freq'});
-bfFreqMixed= bf.linearMixedModel(data,'rt~freq+ ori:freq','treatAsRandom',{'freq'});
+bfFullMixed= bf.anova(data,'rt~ori*freq','treatAsRandom',{'freq'});
+bfBothMixed= bf.anova(data,'rt~ori+freq','treatAsRandom',{'freq'});
+bfOriMixed= bf.anova(data,'rt~ori +ori:freq','treatAsRandom',{'freq'});
+bfFreqMixed= bf.anova(data,'rt~freq+ ori:freq','treatAsRandom',{'freq'});
 
 bf10(1,2) = bfFullMixed/bfFreqMixed;
 bf10(2,2) = bfFullMixed/bfOriMixed;
@@ -67,20 +67,20 @@ bf10(3,2) = bfFullMixed/bfBothMixed;
 
 
 % Ori random , freq fixed
-bfFullMixed= bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'ori'});
-bfBothMixed= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'ori'});
-bfOriMixed= bf.linearMixedModel(data,'rt~ori +ori:freq','treatAsRandom',{'ori'});
-bfFreqMixed= bf.linearMixedModel(data,'rt~freq+ ori:freq','treatAsRandom',{'ori'});
+bfFullMixed= bf.anova(data,'rt~ori*freq','treatAsRandom',{'ori'});
+bfBothMixed= bf.anova(data,'rt~ori+freq','treatAsRandom',{'ori'});
+bfOriMixed= bf.anova(data,'rt~ori +ori:freq','treatAsRandom',{'ori'});
+bfFreqMixed= bf.anova(data,'rt~freq+ ori:freq','treatAsRandom',{'ori'});
 
 bf10(1,3) = bfFullMixed/bfFreqMixed;
 bf10(2,3) = bfFullMixed/bfOriMixed;
 bf10(3,3) = bfFullMixed/bfBothMixed;
 
 % Both random
-bfFullRandom =bf.linearMixedModel(data,'rt~ori*freq','treatAsRandom',{'freq','ori'});
-bfBothRandom= bf.linearMixedModel(data,'rt~ori+freq','treatAsRandom',{'freq','ori'});
-bfOriRandom= bf.linearMixedModel(data,'rt~ori+ori:freq','treatAsRandom',{'freq','ori'});
-bfFreqRandom= bf.linearMixedModel(data,'rt~freq+ori:freq','treatAsRandom',{'freq','ori'});
+bfFullRandom =bf.anova(data,'rt~ori*freq','treatAsRandom',{'freq','ori'});
+bfBothRandom= bf.anova(data,'rt~ori+freq','treatAsRandom',{'freq','ori'});
+bfOriRandom= bf.anova(data,'rt~ori+ori:freq','treatAsRandom',{'freq','ori'});
+bfFreqRandom= bf.anova(data,'rt~freq+ori:freq','treatAsRandom',{'freq','ori'});
 
 bf10(1,4) = bfFullRandom/bfFreqRandom;
 bf10(2,4) = bfFullRandom/bfOriRandom;
@@ -105,7 +105,7 @@ end
 function rouderFigure4(nrSets)
 % Runs the simulations of Rouder et al. 2009 in Figure 4.
 % This basically shows the ability to extract Main and Interaction effects
-% in a 2-way ANOVA.
+% in a 2-way evidenceBoundary.
 load rouder2012Data
 bf=bayesFactor;
 effects = [0   0   0
@@ -130,10 +130,10 @@ for j=1:nrEffects
     for i=1:nrSets
         tmp  =data;
         tmp.rt =rt + randn([size(X,1) 1]);
-        bfFull = bf.linearMixedModel(tmp,'rt~ori*freq');
-        bfMain = bf.linearMixedModel(tmp,'rt~ori+freq');
-        bfOri(i,j)  = bf.linearMixedModel(tmp,'rt~ori');
-        bfFreq(i,j)  = bf.linearMixedModel(tmp,'rt~freq');
+        bfFull = bf.anova(tmp,'rt~ori*freq');
+        bfMain = bf.anova(tmp,'rt~ori+freq');
+        bfOri(i,j)  = bf.anova(tmp,'rt~ori');
+        bfFreq(i,j)  = bf.anova(tmp,'rt~freq');
         bfInteraction(i,j) = bfFull/bfMain;
     end
 end
@@ -201,6 +201,7 @@ end
 
 %%
 figure(2);
+clf;
 plot(N,criticalT)
 xlabel 'Sample Size'
 ylabel 'Critical t-value'

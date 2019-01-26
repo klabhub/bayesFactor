@@ -8,7 +8,7 @@
 %
 % * One sample t-test  (|ttest|)
 % * Two sample t-test (|ttest2|)
-% * N-Way Anova with fixed and random effects  (|linearMixedModel|)
+% * N-Way Anova with fixed and random effects  (|anova|)
 % * Pearson Correlation  (|corr|)
 % * Binomial Test  ( |binom| )
 %
@@ -62,7 +62,7 @@ bf01 = 1/bf10
 %
 % The ANOVA function uses Monte Carlo Integration with parameters that are 
 % set in the bayesFactor class. Therefore we first need to construct an 
-% instance of the class, and then use that to call linearMixedModel (as
+% instance of the class, and then use that to call |anova| (as
 % opposed to other statistical function such as |ttest| ,| ttest2| , and |corr|,
 % which can be called from the class itself (they are |Static| member
 % functions):
@@ -72,32 +72,32 @@ bf= bayesFactor; % Need an instance of the bayesFactor class for ANOVA.
 load rouder2012Data
 % Analyze full model (linear effects of frequency and
 % orientation plus their interaction) 
-[bfFull,modelFull] = bf.linearMixedModel(data,'rt~ori*freq');
+[bfFull,modelFull] = bf.anova(data,'rt~ori*freq');
 
 %%
-% The |modelFull| is a LinearModel from the Matlab Statistics toolbox.
+% The |modelFull| is a LinearMixedModel from the Matlab Statistics toolbox.
 % It has some handy methods that allow us to view the data and the
 % effects
-% The ANOVA table and the firgure show a main effect of |ori| 
+% The ANOVA table shows a main effect of |ori| 
 
 modelFull.anova
-figure;
-plotEffects(modelFull);% Show main effects with error bars
 
 %%
 % The Bayes Factor shows that the Full model is better than the Null model
 % (i.e. intercept only model)
 bfFull
+
 %%
 % To specifically look at the evidence for a main effect of orientation, we
 % need to compare the Bayes Factor of the full model to a restricted model
 % in which everything except the main effect of orientation is kept.
 
-bfRestricted  =   bf.linearMixedModel(data,'rt~freq +ori:freq');  % Keep main of freq and ori:freq interaction.
+bfRestricted  =   bf.anova(data,'rt~freq +ori:freq');  % Keep main of freq and ori:freq interaction.
 
 %% 
 % The evidence for the main effect is the ratio of the Bayes Factors. 
 bfMain = bfFull/bfRestricted
+
 %%
 % The evidence is overwhelmingly in favor of a main effect of orientation.
 
@@ -111,9 +111,12 @@ bfMain = bfFull/bfRestricted
 % Figure 2 compares critical T-values for a traditional t-test with a Bayes
 % Factor analysis.
 rouderFigures(2); 
+
 %%
 % Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.
 rouderFigures(4,100); % Use 100 bootstrap sets . 
+
+
 %%
 % Figure 5 illustrates the influence of fixed and random effects
 rouderFigures(5); 
