@@ -62,7 +62,7 @@ switch (nr)
         % require a larger number of MonteCarlo simulations (nrMC)- here we
         % just run 100 to illustrate the main point.
         effectFun =@(N) (0.5+0.1*randn([N 1])); % effect size is drawn from a distributionacross
-        N = 20:1:200;  %     Sequential sampliung from 20 to 200 samples
+        N = 20:1:200;  %     Sequential sampliung from 20 to 200 samples (truly open ended has not been implemented)
         figure(4);
         clf;
         results = designAnalysis(o,'N',N,'test','ttest2','sequential',true,'tail','left','effectSize',effectFun,'scale',sqrt(2)/2,'nrMC',100,'plot',true);  
