@@ -1,10 +1,9 @@
-function results = schoenbrodtFigures(nr)
-% Test the bayesFactor package by generating figures as in :
-% 
+function results = schoenbrodtFigures(nr,nrMC)
+% Run the Bayes Factor Design Analysis simulations of Schoenbdort & Wagenmakers
+%
 % Schoenbrodt, F. D. & Wagenmakers, E. J. 
 % Bayes factor design analysis: Planning for compelling evidence. 
 % Psychon. Bull. Rev. 1–15 (2017). doi:10.3758/s13423-017-1230-y
-% 
 % 
 % Please note that the various numerical comparisons are not expected to
 % match perfectly; there is randomization in the effects, in the noise
@@ -14,8 +13,9 @@ function results = schoenbrodtFigures(nr)
 %
 % BK  -Jan 2019
 
-
-o = bayesFactor; % Create a bf object
+if nargin <2
+    nrMC = 20; % Quick - test only. Set to 10000 for reliable results
+end
 switch (nr)
     case 3
         %%
@@ -27,7 +27,7 @@ switch (nr)
         clf;
         N = [20 100];
         evidenceBoundary = 6;
-        results = designAnalysis(o,'N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',50000);  
+        results = bf.designAnalysis('N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',nrMC);  
         for i=1:numel(N)
             disp('***************')
             disp(['N = ' num2str(N(i))])
@@ -44,7 +44,7 @@ switch (nr)
         % around that. In a real design you would explore a wider range.
         N = [100 120 140:1:150];
         pSuccess = 0.95;
-        results = designAnalysis(o,'N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',10000,'pSuccess',pSuccess,'plot',false);  
+        results = bf.designAnalysis('N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',nrMC,'pSuccess',pSuccess,'plot',false);  
         disp('**************')
         disp(['Necessary sample size for ' num2str(100*pSuccess) '% success under H1 is ' num2str(results.H1.N.min)]);
         ix  = N==results.H1.N.min;
@@ -65,7 +65,7 @@ switch (nr)
         N = 20:1:200;  %     Sequential sampliung from 20 to 200 samples (truly open ended has not been implemented)
         figure(4);
         clf;
-        results = designAnalysis(o,'N',N,'test','ttest2','sequential',true,'tail','left','effectSize',effectFun,'scale',sqrt(2)/2,'nrMC',100,'plot',true);  
+        results = bf.designAnalysis('N',N,'test','ttest2','sequential',true,'tail','left','effectSize',effectFun,'scale',sqrt(2)/2,'nrMC',nrMC,'plot',true);  
         disp(['False Positive Rate: ' num2str(100*results.H0.pFalse) '%'])
         disp(['False Negative Rate: ' num2str(100*results.H1.pFalse) '%'])
         disp(['Median Sample Size (H1): ' num2str(results.H1.N.median)])
@@ -83,7 +83,7 @@ case 5
         evidenceBoundary  = [1/6 30]; %Evidence for H0 is accepted at 1/6, evidence for H1 needs a BF of 30.
         figure(5);
         clf;
-        results = designAnalysis(o,'N',N,'test','ttest2','sequential',true,'tail','left','effectSize',effectFun,'scale',sqrt(2)/2,'nrMC',100,'plot',true,'evidenceBoundary',evidenceBoundary);  
+        results = bf.designAnalysis('N',N,'test','ttest2','sequential',true,'tail','left','effectSize',effectFun,'scale',sqrt(2)/2,'nrMC',nrMC,'plot',true,'evidenceBoundary',evidenceBoundary);  
         disp(['False Positive Rate: ' num2str(100*results.H0.pFalse) '%'])
         disp(['False Negative Rate: ' num2str(100*results.H1.pFalse) '%'])
         disp(['Median Sample Size (H1): ' num2str(results.H1.N.median)])
