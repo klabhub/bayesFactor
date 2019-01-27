@@ -30,7 +30,6 @@ function [results] = designAnalysis(varargin)
 %                   use an anonymouys function. For instance,
 %                   for an effect size with a mean of 0.5 and stdev of 0.1,
 %                   pass @(N) (0.5_0.1*randn([N 1]])
-% designMatrix = The design matrix for a linear mixed model.
 %
 % tail = Tail for TTest/TTest2. [both]
 % scale = SCale of the Cauchy prior [sqrt(2)/2].
@@ -40,7 +39,7 @@ function [results] = designAnalysis(varargin)
 % for ANOVA test
 % plot = Toggle to show graphical output as in Schoenbrodt &
 %                   Wagenmakers
-%
+% options = Monte Carlo /Parralel execution options [bf.options]
 %
 % To add your own analysis, but reuse the looping/graphing from
 % this funcition, set 'test' to 'SPECIAL' and provide
@@ -152,7 +151,11 @@ results.H0.bf.all = nan(p.Results.nrMC,nrN);
 maxN = max(p.Results.N);
 upperBF = max(p.Results.evidenceBoundary);
 lowerBF = min(p.Results.evidenceBoundary);
-
+if isa(p.Results.effectSize,'function_handle')
+    es = p.Results.effectSize(maxN);
+else
+    es = p.Results.effectSize;
+end 
 if p.Results.sequential
     % Run a sequential design :  generate fake data for maxN
     % subjects but sample htese successively and at each step
@@ -162,42 +165,42 @@ if p.Results.sequential
     nFalseNegative = 0;
     h1BfAll = nan(p.Results.nrMC,nrN);
     h0BfAll = nan(p.Results.nrMC,nrN);
-    if isa(p.Results.effectSize,'function_handle')
-        es = p.Results.effectSize(maxN);
-    else
-        es = p.Results.effectSize;
-    end
-    parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)       
-        data  = dataFun(es,maxN);
-        nullData  = dataFun(0,maxN);
-        for i=1:nrN
-            % Sequential sampling for H1 data
-            thisData = cellfun(@(x)(x(1:N(i))),data,'UniformOutput',false); %#ok<PFBNS>
-            h1BfAll(j,i) = bfFun(thisData{:});
-            if h1BfAll(j,i) > upperBF || h1BfAll(j,i) < lowerBF
-                % Crossed threshold. Stop sampling.
-                if h1BfAll(j,i) <lowerBF
-                    nFalseNegative= nFalseNegative+1;
-                end
-                break;
+    parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)
+        for h=0:1
+            thisBf = nan(1,nrN);
+            if h==0
+                % H0
+                data = dataFun(0,maxN);
+            else
+                % H1
+                data  = dataFun(es,maxN);
             end
-        end
-        for i=1:nrN
-            % Sequential sampling for HO data
-            thisNullData = cellfun(@(x)(x(1:N(i))),nullData,'UniformOutput',false);
-            h0BfAll(j,i) = bfFun(thisNullData{:});
-            if h0BfAll(j,i) >upperBF|| h0BfAll(j,i) < lowerBF
-                % Crossed threshold. Stop sampling.
-                if h0BfAll(j,i) >upperBF
-                    nFalsePositive= nFalsePositive+1;
+            for i=1:nrN
+                % Sequential sampling for H1 data
+                thisData = cellfun(@(x)(x(1:N(i))),data,'UniformOutput',false); %#ok<PFBNS>
+                thisBf(i) = bfFun(thisData{:});
+                if thisBf(i) > upperBF || thisBf(i) < lowerBF
+                    % Crossed threshold. Stop sampling.
+                    if thisBf(i) <lowerBF
+                        if h==0
+                            nFalsePositive= nFalsePositive+1;
+                        else
+                            nFalseNegative= nFalseNegative+1;
+                        end
+                    end
+                    break;
                 end
-                break;
+            end
+            if h==0
+                h0BfAll(j,:) = thisBf;
+            else
+                h1BfAll(j,:) = thisBf;
             end
         end
     end
     results.H1.bf.all= h1BfAll; % Assign outside parfor
     results.H0.bf.all = h0BfAll;
-  
+    
     % Analyze the results to determine how many samples will
     % be collected
     [ix,col] = find(isnan(results.H1.bf.all)');
@@ -221,19 +224,18 @@ if p.Results.sequential
 else
     % Simualte a regular fixed N design
     h1BfAll = nan(p.Results.nrMC,nrN);
-    h0BfAll = nan(p.Results.nrMC,nrN);
-    parfor j= (1:p.Results.nrMC,p.Results.options.nrWorkers)
-            for i =1:nrN        
-            if isa(p.Results.effectSize,'function_handle')
-                es = p.Results.effectSize(p.Results.N(i));
-            else
-                es = p.Results.effectSize;
-            end
-            data  = dataFun(es,p.Results.N(i));
-            h1BfAll(j,i) =  bfFun(data{:}); % Collect BF under H1            
-            nullData  = dataFun(0,p.Results.N(i));
-            h0BfAll(j,i)= bfFun(nullData{:}); % Collect BF under H0
-            end      
+    h0BfAll = nan(p.Results.nrMC,nrN);            
+    parfor (j= 1:p.Results.nrMC,p.Results.options.nrWorkers)
+        thisBf0 = nan(1,nrN);
+        thisBf1 = nan(1,nrN);
+        for i =1:nrN
+            data  = dataFun(es,N(i));
+            thisBf1(i) =  bfFun(data{:}); % Collect BF under H1
+            nullData  = dataFun(0,N(i));
+            thisBf0(i)= bfFun(nullData{:}); % Collect BF under H0
+        end
+        h1BfAll(j,:) = thisBf1;
+        h0BfAll(j,:) = thisBf0;        
     end
     results.H1.bf.all= h1BfAll; % Assign outside parfor
     results.H0.bf.all = h0BfAll;
@@ -247,8 +249,7 @@ else
     results.H0.pFalse =  nanmean(results.H0.bf.all>upperBF);  % Upper evidence boundary under H0 = false positives
     results.H1.pFalse =  nanmean(results.H1.bf.all<lowerBF);  % Lower evidence boundary under H1 - false negatives
     results.H0.bf.median  = median(results.H0.bf.all);
-    results.H1.bf.median = median(results.H1.bf.all);
-    
+    results.H1.bf.median = median(results.H1.bf.all);    
 end
 
 

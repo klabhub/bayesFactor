@@ -8,5 +8,5 @@ opt.nDimsForMC = 3; % If there are this many dimensions, use MC integration
 % 1 and 2D integration work fine with standard
 % integral.m but 3d is slow and higher not
 % possible.
-opt.nrWorkers = 0;  % Set to zero to use serial execution (i.e. disable parfor loops in the code)
+opt.nrWorkers = 4;  % Set to zero to use serial execution (i.e. disable parfor loops in the code)
 end
