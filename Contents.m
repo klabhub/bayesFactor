@@ -1,4 +1,6 @@
 % BAYESFACTOR
+% version 1.1 27-JAN-2019
+% See https://klabhub.github.io/bayesFactor/ 
 %
 % Files
 %   index              - Getting Started with the bayesFactor Toolbox
