@@ -5,7 +5,7 @@ function rouderFigure4(nrSets)
 if nargin <1
     nrSets = 10;
 end
-load rouder2012Data
+rouder2012 = load('rouder2012Data.mat');
 effects = [0   0   0
     0.2 0   0
     0.5 0   0
@@ -22,11 +22,14 @@ effects = [0   0   0
 nrEffects = size(effects,1);
 % Create a design matrix from the data, only to simulate fake rt's with
 % different effects
-X= classreg.regr.modelutils.designmatrix(data,'intercept',false,'responsevar','rt','DummyVarCoding','effects','PredictorVars',{'ori','freq'},'model','interactions');
-for j=1:nrEffects
+X= classreg.regr.modelutils.designmatrix(rouder2012.data,'intercept',false,'responsevar','rt','DummyVarCoding','effects','PredictorVars',{'ori','freq'},'model','interactions');
+bfOri = nan(nrSets,nrEffects);
+bfFreq= nan(nrSets,nrEffects);
+bfInteraction= nan(nrSets,nrEffects);
+parfor j=1:nrEffects
     rt = X *effects(j,:)';
     for i=1:nrSets
-        tmp  =data;
+        tmp  =rouder2012.data; %#ok<PFBNS>
         tmp.rt =rt + randn([size(X,1) 1]);
         bfFull = bf.anova(tmp,'rt~ori*freq');
         bfMain = bf.anova(tmp,'rt~ori+freq');

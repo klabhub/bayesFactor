@@ -144,7 +144,8 @@ switch upper(p.Results.test)
 end
 
 % Initialize
-nrN = numel(p.Results.N);
+N = p.Results.N;
+nrN = numel(N);
 results.H1.bf.all = nan(p.Results.nrMC,nrN);
 results.H0.bf.all = nan(p.Results.nrMC,nrN);
 maxN = max(p.Results.N);
@@ -158,21 +159,23 @@ if p.Results.sequential
     % terminate). Repeat this nrMC times.
     nFalsePositive = 0;
     nFalseNegative = 0;
-    for j=1:p.Results.nrMC
-        if isa(p.Results.effectSize,'function_handle')
-            es = p.Results.effectSize(maxN);
-        else
-            es = p.Results.effectSize;
-        end
+    h1BfAll = nan(p.Results.nrMC,nrN);
+    h0BfAll = nan(p.Results.nrMC,nrN);
+    if isa(p.Results.effectSize,'function_handle')
+        es = p.Results.effectSize(maxN);
+    else
+        es = p.Results.effectSize;
+    end
+    parfor j=1:p.Results.nrMC       
         data  = dataFun(es,maxN);
         nullData  = dataFun(0,maxN);
         for i=1:nrN
             % Sequential sampling for H1 data
-            thisData = cellfun(@(x)(x(1:p.Results.N(i))),data,'UniformOutput',false);
-            results.H1.bf.all(j,i) = bfFun(thisData{:});
-            if results.H1.bf.all(j,i) > upperBF || results.H1.bf.all(j,i) < lowerBF
+            thisData = cellfun(@(x)(x(1:N(i))),data,'UniformOutput',false); %#ok<PFBNS>
+            h1BfAll(j,i) = bfFun(thisData{:});
+            if h1BfAll(j,i) > upperBF || h1BfAll(j,i) < lowerBF
                 % Crossed threshold. Stop sampling.
-                if results.H1.bf.all(j,i) <lowerBF
+                if h1BfAll(j,i) <lowerBF
                     nFalseNegative= nFalseNegative+1;
                 end
                 break;
@@ -180,17 +183,20 @@ if p.Results.sequential
         end
         for i=1:nrN
             % Sequential sampling for HO data
-            thisNullData = cellfun(@(x)(x(1:p.Results.N(i))),nullData,'UniformOutput',false);
-            results.H0.bf.all(j,i) = bfFun(thisNullData{:});
-            if results.H0.bf.all(j,i) >upperBF|| results.H0.bf.all(j,i) < lowerBF
+            thisNullData = cellfun(@(x)(x(1:N(i))),nullData,'UniformOutput',false);
+            h0BfAll(j,i) = bfFun(thisNullData{:});
+            if h0BfAll(j,i) >upperBF|| h0BfAll(j,i) < lowerBF
                 % Crossed threshold. Stop sampling.
-                if results.H0.bf.all(j,i) >upperBF
+                if h0BfAll(j,i) >upperBF
                     nFalsePositive= nFalsePositive+1;
                 end
                 break;
             end
         end
     end
+    results.H1.bf.all= h1BfAll; % Assign outside parfor
+    results.H0.bf.all = h0BfAll;
+  
     % Analyze the results to determine how many samples will
     % be collected
     [ix,col] = find(isnan(results.H1.bf.all)');
@@ -213,19 +219,23 @@ if p.Results.sequential
     
 else
     % Simualte a regular fixed N design
-    for i =1:nrN
-        for j= 1:p.Results.nrMC
+    h1BfAll = nan(p.Results.nrMC,nrN);
+    h0BfAll = nan(p.Results.nrMC,nrN);
+    parfor j= 1:p.Results.nrMC
+            for i =1:nrN        
             if isa(p.Results.effectSize,'function_handle')
                 es = p.Results.effectSize(p.Results.N(i));
             else
                 es = p.Results.effectSize;
             end
             data  = dataFun(es,p.Results.N(i));
-            results.H1.bf.all(j,i) = bfFun(data{:}); % Collect BF under H1
+            h1BfAll(j,i) =  bfFun(data{:}); % Collect BF under H1            
             nullData  = dataFun(0,p.Results.N(i));
-            results.H0.bf.all(j,i) = bfFun(nullData{:}); % Collect BF under H0
-        end
+            h0BfAll(j,i)= bfFun(nullData{:}); % Collect BF under H0
+            end      
     end
+    results.H1.bf.all= h1BfAll; % Assign outside parfor
+    results.H0.bf.all = h0BfAll;
     % Calculate the minimum number of samples needed to reach
     % H1 evidence boundary in p.Restuls.fractionSuccess of the
     % experiments

@@ -133,14 +133,14 @@ rouderFigure2;
 % Figure 4 shows Bayes Factor analysis for simulated data with different 
 % effect sizes.
 % 
-rouderFigure4(1000); % Use 1000 bootstrap sets . 
+rouderFigure4(100); % Use 100 bootstrap sets . 
 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
 % 
 rouderFigure5;
 
-%% Bayes Factor Deisng Analysis - Figures from Schoenbrodt & Wagenmakers 
+%% Bayes Factor Design Analysis - Figures from Schoenbrodt & Wagenmakers 
 % This paper provides a tutorial treatment of Bayes Factor Design Analysis.
 %  Please see |schoenbrodtFigures.m| for details.
 
