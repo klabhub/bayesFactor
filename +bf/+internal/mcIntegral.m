@@ -1,4 +1,4 @@
-function v = mcIntegral(fun,prior,nrDims,mcOptions)
+function v = mcIntegral(fun,prior,nrDims,options)
 % Monte Carlo integration
 %
 % INPUT
@@ -13,13 +13,13 @@ function v = mcIntegral(fun,prior,nrDims,mcOptions)
 
 
 %% Setup the PDF to do importance sampling
-gRange =  mcOptions.minG:mcOptions.stepG:mcOptions.maxG;
+gRange =  options.minG:options.stepG:options.maxG;
 pdf = prior(gRange);
 pdf = pdf./sum(pdf);
 % Draw samples weighted by this prior.
-g =nan(nrDims,mcOptions.nrSamples);
+g =nan(nrDims,options.nrSamples);
 for d=1:nrDims
-    g(d,:) = randsample(gRange,mcOptions.nrSamples,true,pdf);
+    g(d,:) = randsample(gRange,options.nrSamples,true,pdf);
 end
 %% Evaluate the function at these g values
 bf10Samples = fun(g);

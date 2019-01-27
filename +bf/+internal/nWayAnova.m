@@ -7,13 +7,13 @@ function bf10 = nWayAnova(y,X,varargin)
 % Parm/Value pairs
 % 'sharedPriors'  - Cell array of vectors indicating which effects (columns
 % of X) share the same prior. [{1:nrEffects}]: all effects share the same prior.
-% 'mcOptions' - Monte Carlo integration optionss. [bf.mcOptions]
+% 'options' - Monte Carlo integration and parrallel computation optionss. [bf.options]
 % BK 2018
 nrEffects = size(X,2);
 
 p =inputParser;
 p.addParameter('sharedPriors',{},@iscell); % Which effects share a prior? A cell array with indices corresponding to columns of X
-p.addParameter('mcOptions',bf.mcOptions);
+p.addParameter('options',bf.options);
 p.parse(varargin{:});
 
 if isempty(p.Results.sharedPriors)
@@ -23,11 +23,11 @@ else
 end
 
 prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,1));
-integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors).*prod(prior(cat(1,varargin{:})),1));
+integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),1));
 nrDims = numel(sharedPriors);
-if nrDims>= p.Results.mcOptions.nDimsForMC
+if nrDims>= p.Results.options.nDimsForMC
     % Use MC Sampling to calculate the integral
-    bf10 = bf.internal.mcIntegral(integrand,prior,nrDims,p.Results.mcOptions);
+    bf10 = bf.internal.mcIntegral(integrand,prior,nrDims,p.Results.options);
 else
     switch (nrDims)
         case 1

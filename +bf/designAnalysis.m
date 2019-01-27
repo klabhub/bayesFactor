@@ -115,6 +115,7 @@ p.addParameter('scale',sqrt(2)/2);
 p.addParameter('plot',true);
 p.addParameter('bfFun',[]);  % For 'test'=='SPECIAL' - specify your own bfFun and dataFun here.
 p.addParameter('dataFun',[]);
+p.addParameter('options',bf.options);
 p.parse(varargin{:});
 results.H1 = struct('N',struct('min',NaN,'median',NaN,'all',[],'pMax',NaN),'bf',struct('all',[],'median',nan),'pFalse',[]);
 results.H0 = results.H1;
@@ -166,7 +167,7 @@ if p.Results.sequential
     else
         es = p.Results.effectSize;
     end
-    parfor j=1:p.Results.nrMC       
+    parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)       
         data  = dataFun(es,maxN);
         nullData  = dataFun(0,maxN);
         for i=1:nrN
@@ -221,7 +222,7 @@ else
     % Simualte a regular fixed N design
     h1BfAll = nan(p.Results.nrMC,nrN);
     h0BfAll = nan(p.Results.nrMC,nrN);
-    parfor j= 1:p.Results.nrMC
+    parfor j= (1:p.Results.nrMC,p.Results.options.nrWorkers)
             for i =1:nrN        
             if isa(p.Results.effectSize,'function_handle')
                 es = p.Results.effectSize(p.Results.N(i));

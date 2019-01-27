@@ -1,9 +1,12 @@
-function rouderFigure4(nrSets)
+function rouderFigure4(nrSets,options)
 % Runs the simulations of Rouder et al. 2009 in Figure 4.
 % This basically shows the ability to extract Main and Interaction effects
 % in a 2-way anova.
-if nargin <1
-    nrSets = 10;
+if nargin<2
+    options = bf.options;
+    if nargin <1
+        nrSets = 10;
+    end
 end
 rouder2012 = load('rouder2012Data.mat');
 effects = [0   0   0
@@ -26,7 +29,7 @@ X= classreg.regr.modelutils.designmatrix(rouder2012.data,'intercept',false,'resp
 bfOri = nan(nrSets,nrEffects);
 bfFreq= nan(nrSets,nrEffects);
 bfInteraction= nan(nrSets,nrEffects);
-parfor j=1:nrEffects
+parfor (j=1:nrEffects,options.nrWorkers)
     rt = X *effects(j,:)';
     for i=1:nrSets
         tmp  =rouder2012.data; %#ok<PFBNS>
