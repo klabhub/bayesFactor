@@ -6,7 +6,7 @@
    <!--
 This HTML was auto-generated from MATLAB code.
 To make changes, update the MATLAB code and republish this document.
-      --><title>Getting Started with the bayesFactor Toolbox</title><meta name="generator" content="MATLAB 9.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2019-01-27"><meta name="DC.source" content="index.m"><style type="text/css">
+      --><title>Getting Started with the bayesFactor Toolbox</title><meta name="generator" content="MATLAB 9.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2019-01-28"><meta name="DC.source" content="index.m"><style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
 
 html { min-height:100%; margin-bottom:1px; }
@@ -116,33 +116,48 @@ ans =
 </pre><pre class="codeoutput">
 bfFull =
 
-   12.1961
+   12.3701
 
 </pre><p>To specifically look at the evidence for a main effect of orientation, we need to compare the Bayes Factor of the full model to a restricted model in which everything except the main effect of orientation is kept.</p><pre class="codeinput">bfRestricted  =   bf.anova(data,<span class="string">'rt~freq +ori:freq'</span>);  <span class="comment">% Keep main of freq and ori:freq interaction.</span>
 </pre><p>The evidence for the main effect is the ratio of the Bayes Factors.</p><pre class="codeinput">bfMain = bfFull/bfRestricted
 </pre><pre class="codeoutput">
 bfMain =
 
-  177.1230
+  179.6498
 
 </pre><p>The evidence is overwhelmingly in favor of a main effect of orientation.</p><h2 id="19">Figures from Rouder et al. 2012</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al. paper. To test the package, I recreated some of the figures in their publication.</p><p>Figure 2 in Rouder et al compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput">rouderFigure2;
-</pre><img vspace="5" hspace="5" src="index_01.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput">rouderFigure4(100); <span class="comment">% Use 100 bootstrap sets .</span>
+</pre><img vspace="5" hspace="5" src="index_01.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput">rouderFigure4(1000); <span class="comment">% Use 1000 bootstrap sets .</span>
 </pre><img vspace="5" hspace="5" src="index_02.png" alt=""> <p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput">rouderFigure5;
 </pre><img vspace="5" hspace="5" src="index_03.png" alt=""> <h2 id="22">Bayes Factor Design Analysis - Figures from Schoenbrodt &amp; Wagenmakers</h2><p>This paper provides a tutorial treatment of Bayes Factor Design Analysis.  Please see <tt>schoenbrodtFigures.m</tt> for details.</p><pre class="codeinput"><span class="comment">% Figure 3 in S&amp;W analyzes a Fixed-N design for a T-test.</span>
 schoenbrodtFigures(3,10000); <span class="comment">% 10000 Monte Carlo sims</span>
-</pre><pre class="codeoutput error">Error using bf.designAnalysis
-Error: File: C:\Users\bart.VISION\OneDrive - Rutgers University\Documents\common\github\bayesFactor\+bf\designAnalysis.m Line: 175 Column: 13
-The variable h1BfAll in a parfor cannot be classified.
-See Parallel for Loops in MATLAB, "Overview".
-
-Error in schoenbrodtFigures (line 30)
-        results = bf.designAnalysis('N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',nrMC);  
-
-Error in index (line 148)
-schoenbrodtFigures(3,10000); % 10000 Monte Carlo sims
-</pre><p>Figure 4 in S&amp;@ analyzes a Bayes sequential sampling design.</p><pre class="codeinput">schoenbrodtFigures(4,10000); <span class="comment">% 10000 Monte Carlo sims</span>
-</pre><p>Figure 5 refines the Sequential design analysis</p><pre class="codeinput">schoenbrodtFigures(5,10000); <span class="comment">% 10000 Monte Carlo sims</span>
-</pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
+</pre><pre class="codeoutput">***************
+N = 20
+False Positives (%): 0
+False Negatives (%): 0
+True Positives (%) 0
+True Negatives (%) 0
+***************
+N = 100
+False Positives (%): 0
+False Negatives (%): 0
+True Positives (%) 100
+True Negatives (%) 0
+**************
+Necessary sample size for 95% success under H1 is 143
+False negative rate under that scenario: 0
+False positive rate under H0: 0.47
+True negative rate under H0: 61.13
+</pre><img vspace="5" hspace="5" src="index_04.png" alt=""> <p>Figure 4 in S&amp;@ analyzes a Bayes sequential sampling design.</p><pre class="codeinput">schoenbrodtFigures(4,10000); <span class="comment">% 10000 Monte Carlo sims</span>
+</pre><pre class="codeoutput">False Positive Rate: 85.63%
+False Negative Rate: 3.49%
+Median Sample Size (H1): 40
+Median Sample Size (H0): 41
+</pre><img vspace="5" hspace="5" src="index_05.png" alt=""> <p>Figure 5 refines the Sequential design analysis</p><pre class="codeinput">schoenbrodtFigures(5,10000); <span class="comment">% 10000 Monte Carlo sims</span>
+</pre><pre class="codeoutput">False Positive Rate: 71.48%
+False Negative Rate: 1.32%
+Median Sample Size (H1): 75
+Median Sample Size (H0): 55
+</pre><img vspace="5" hspace="5" src="index_06.png" alt=""> <p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
 ##### SOURCE BEGIN #####
 %% Getting Started with the bayesFactor Toolbox
 %% Description
@@ -279,7 +294,7 @@ rouderFigure2;
 % Figure 4 shows Bayes Factor analysis for simulated data with different 
 % effect sizes.
 % 
-rouderFigure4(100); % Use 100 bootstrap sets . 
+rouderFigure4(1000); % Use 1000 bootstrap sets . 
 
 %%
 % Figure 5 illustrates the influence of fixed and random effects

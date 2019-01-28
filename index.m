@@ -133,7 +133,7 @@ rouderFigure2;
 % Figure 4 shows Bayes Factor analysis for simulated data with different 
 % effect sizes.
 % 
-rouderFigure4(100); % Use 100 bootstrap sets . 
+rouderFigure4(1000); % Use 1000 bootstrap sets . 
 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
