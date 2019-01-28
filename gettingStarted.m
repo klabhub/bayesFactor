@@ -145,15 +145,15 @@ rouderFigure5;
 %  Please see |schoenbrodtFigures.m| for details.
 
 % Figure 3 in S&W analyzes a Fixed-N design for a T-test.
-schoenbrodtFigures(3,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(3,1000); % 10000 Monte Carlo sims
 
 %%
 %
 % Figure 4 in S&@ analyzes a Bayes sequential sampling design.
-schoenbrodtFigures(4,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(4,1000); % 10000 Monte Carlo sims
 
 %%
 % 
 % Figure 5 refines the Sequential design analysis
 
-schoenbrodtFigures(5,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(5,1000); % 10000 Monte Carlo sims

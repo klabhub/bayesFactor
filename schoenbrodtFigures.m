@@ -26,16 +26,13 @@ switch (nr)
         figure(2);
         clf;
         N = [20 100];
-        evidenceBoundary = 6;
         results = bf.designAnalysis('N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',nrMC);  
-        for i=1:numel(N)
-            disp('***************')
-            disp(['N = ' num2str(N(i))])
-            disp(['False Positives (%): ' num2str(100*mean(results.H0.bf.all(i)>evidenceBoundary))])% Under H0 above evidenceBoundary of 6
-            disp(['False Negatives (%): ' num2str(100*mean(results.H1.bf.all(i)<1/evidenceBoundary))])% Under H1 below evidenceBoundary of 1/6
-            disp(['True Positives (%) ' num2str(100*mean(results.H1.bf.all(i)>evidenceBoundary))])% Under H1 aove evidenceBoundary of 6
-            disp(['True Negatives (%) ' num2str(100*mean(results.H0.bf.all(i)<1/evidenceBoundary))]);% Under H0 below evidenceBoundary of 1/6
-        end
+        disp('***************')
+        disp(['N = ' num2str(N)])
+        disp(['False Positives (%): ' num2str(100*results.H0.pFalse)])% Under H0 above evidenceBoundary of 6
+        disp(['False Negatives (%): ' num2str(100*results.H1.pFalse)]);% Under H1 below evidenceBoundary of 1/6
+        disp(['True Positives (%) ' num2str(100*results.H1.pTrue)])% Under H1 aove evidenceBoundary of 6
+        disp(['True Negatives (%) ' num2str(100*results.H0.pTrue)]);% Under H0 below evidenceBoundary of 1/6        
         
         %%
         % % Sample size determination to see how many samples are needed to
@@ -46,11 +43,10 @@ switch (nr)
         pSuccess = 0.95;
         results = bf.designAnalysis('N',N,'test','ttest2','sequential',false,'tail','left','effectSize',0.5,'scale',sqrt(2)/2,'nrMC',nrMC,'pSuccess',pSuccess,'plot',false);  
         disp('**************')
-        disp(['Necessary sample size for ' num2str(100*pSuccess) '% success under H1 is ' num2str(results.H1.N.min)]);
-        ix  = N==results.H1.N.min;
-        disp(['False negative rate under that scenario: '  num2str(100*mean(results.H1.bf.all(:,ix)<1/evidenceBoundary))]);
-        disp(['False positive rate under H0: '  num2str(100*mean(results.H0.bf.all(:,ix)>evidenceBoundary))]);
-        disp(['True negative rate under H0: '  num2str(100*mean(results.H0.bf.all(:,ix)<1/evidenceBoundary))]);
+        disp(['Necessary sample size for ' num2str(100*pSuccess) '% success under H1 is ' num2str(results.H1.N.min)]);       
+        disp(['False Positives (%): ' num2str(100*results.H0.pFalse)])% Under H0 above evidenceBoundary of 6
+        disp(['False Negatives (%): ' num2str(100*results.H1.pFalse)]);% Under H1 below evidenceBoundary of 1/6
+        disp(['True negative  (%): '  num2str(100*results.H0.pTrue)]);
         
         
     case 4 

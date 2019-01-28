@@ -161,14 +161,14 @@ if p.Results.sequential
     % subjects but sample htese successively and at each step
     % test whether the BF is above threshold (and if so,
     % terminate). Repeat this nrMC times.
-    nFalsePositive = 0;
-    nFalseNegative = 0;
+    nrFalsePositive = 0;
+    nrFalseNegative = 0;
     h1BfAll = nan(p.Results.nrMC,nrN);
     h0BfAll = nan(p.Results.nrMC,nrN);
     parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)
-        for h=0:1
+        for hyp=0:1
             thisBf = nan(1,nrN);
-            if h==0
+            if hyp==0
                 % H0
                 data = dataFun(0,maxN);
             else
@@ -182,16 +182,16 @@ if p.Results.sequential
                 if thisBf(i) > upperBF || thisBf(i) < lowerBF
                     % Crossed threshold. Stop sampling.
                     if thisBf(i) <lowerBF
-                        if h==0
-                            nFalsePositive= nFalsePositive+1;
+                        if hyp==0
+                            nrFalsePositive= nrFalsePositive+1;
                         else
-                            nFalseNegative= nFalseNegative+1;
+                            nrFalseNegative= nrFalseNegative+1;
                         end
                     end
                     break;
                 end
             end
-            if h==0
+            if hyp==0
                 h0BfAll(j,:) = thisBf;
             else
                 h1BfAll(j,:) = thisBf;
@@ -209,7 +209,7 @@ if p.Results.sequential
     nrMax = p.Results.nrMC- numel(isFirst);
     results.H1.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
     results.H1.N.median = median(results.H1.N.all);
-    results.H1.pFalse  = nFalseNegative./p.Results.nrMC;
+    results.H1.pFalse  = nrFalseNegative./p.Results.nrMC;
     results.H1.N.pMax = nrMax./p.Results.nrMC;
     
     [ix,col] = find(isnan(results.H0.bf.all)');
@@ -218,9 +218,12 @@ if p.Results.sequential
     nrMax = p.Results.nrMC- numel(isFirst);
     results.H0.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
     results.H0.N.median = median(results.H0.N.all);
-    results.H0.pFalse  = nFalsePositive./p.Results.nrMC;
+    results.H0.pFalse  = nrFalsePositive./p.Results.nrMC;
     results.H0.N.pMax = nrMax./p.Results.nrMC;
-    
+   
+    results.H0.pTrue =  (p.Results.nrMC-nrMax-nrFalsePositive)/p.Results.nrMC;
+    results.H1.pTrue =  (p.Results.nrMC-nrMax-nrFalseNegative)/p.Results.nrMC;
+
 else
     % Simualte a regular fixed N design
     h1BfAll = nan(p.Results.nrMC,nrN);
@@ -243,20 +246,30 @@ else
     % H1 evidence boundary in p.Restuls.fractionSuccess of the
     % experiments
     ix  = mean(results.H1.bf.all>upperBF)>p.Results.pSuccess; %
-    results.H1.N.min = min(p.Results.N(ix));
+    if any(ix)
+        results.H1.N.min = Inf;
+    else
+        results.H1.N.min = min(p.Results.N(ix));
+    end
     ix  = mean(results.H0.bf.all<lowerBF)>p.Results.pSuccess; %
-    results.H0.N.min = min(p.Results.N(ix));
+    if any(ix)
+        results.H0.N.min = Inf;
+    else
+        results.H0.N.min = min(p.Results.N(ix));
+    end
     results.H0.pFalse =  nanmean(results.H0.bf.all>upperBF);  % Upper evidence boundary under H0 = false positives
     results.H1.pFalse =  nanmean(results.H1.bf.all<lowerBF);  % Lower evidence boundary under H1 - false negatives
     results.H0.bf.median  = median(results.H0.bf.all);
     results.H1.bf.median = median(results.H1.bf.all);    
+    results.H0.pTrue =  nanmean(results.H0.bf.all<lowerBF);  % Lower evidence boundary under H0 = true positives
+    results.H1.pTrue =  nanmean(results.H1.bf.all>upperBF);  % Upper evidence boundary under H1 - true positives
+
 end
 
 
 
 % If requested show graphs
-if p.Results.plot
-    
+if p.Results.plot    
     ticks= ([1/10 1/3 1  3 10 30 10.^(2:8)] );
     tickLabels = {'1/10','1/3', '1',' 3','10','30','100','1000','10^4','10^5','10^6','10^7','10^8'};
     clf;
@@ -284,22 +297,27 @@ if p.Results.plot
             end
             toPlot(toPlot>upperBF) = upperBF;
             toPlot(toPlot<lowerBF) = lowerBF;
-            plot(p.Results.N,toPlot','Color',0.5*ones(1,3))
+            if size(toPlot,1)>100
+                % Limit to 100 trajectories
+                toPlot100 = toPlot(randsample(size(toPlot,2),100),:);
+            else
+                toPlot100 = toPlot;
+            end                
+            plot(p.Results.N,toPlot100','Color',0.5*ones(1,3))
             hold on
             plot([1 maxN],upperBF*ones(1,2),'k--')
             plot([1 maxN],lowerBF*ones(1,2),'k--')
             plot(repmat([1 maxN]',[1 numel(ticks)]), repmat(ticks,[2 1]),'k:')
-            set(gca,'YScale','Log','YLim',[lowerBF*0.8 upperBF*1.2],'YTick',ticks,'YTickLabels',tickLabels)
+            set(gca,'YScale','Log','YLim',[lowerBF*0.7 upperBF*1.3],'YTick',ticks,'YTickLabels',tickLabels)
             xlabel 'Sample Size'
             ylabel 'Bayes Factor (BF_{10})'
-            title (['Under ' hyp ': Effect Size= ' es]);
+            title (['BFDA (' p.Results.test '): Under ' hyp ': Effect Size= ' es ' (nrMC = ' num2str(p.Results.nrMC) ')']);
             h1Boundary  = mean(max(toPlot,[],2)>=upperBF);
             text(min(p.Results.N),1.1*upperBF,sprintf('%d%% stopped at H1 Boundary',round(100*h1Boundary)),'FontWeight','Bold');
             h0Boundary = mean(min(toPlot,[],2)<=lowerBF);
             text(min(p.Results.N),0.9*lowerBF,sprintf('%d%% stopped at H0 Boundary',round(100*h0Boundary)),'FontWeight','Bold');
         end
-        h = annotation(gcf,'textbox',[0.3 0.95 0.4 0.025],'String',['BFDA: ' p.Results.test ' (nrMC = ' num2str(p.Results.nrMC) ')']);
-        h.HorizontalAlignment = 'Center';
+        
     else
         % 1 or more fixed N designs.
         % Show evidence histograms for each N (columns) under H1 (top
@@ -344,8 +362,8 @@ if p.Results.plot
         xlims = get(allAx,'XLim');
         xlims = cat(1,xlims{:});
         set(allAx,'XLim',[round(min(xlims(:,1))) round(max(xlims(:,2)))]);
-        h = annotation(gcf,'textbox',[0.3 0.95 0.4 0.025],'String',...
-            ['BFDA: ' p.Results.test ' (nrMC = ' num2str(p.Results.nrMC) ') Minimal N for ' num2str(p.Results.pSuccess*100) '% success = ' num2str(results.H1.N.min) ]);
+%         h = annotation(gcf,'textbox',[0.3 0.95 0.4 0.025],'String',...
+%             ['BFDA: ' p.Results.test ' (nrMC = ' num2str(p.Results.nrMC) ') Minimal N for ' num2str(p.Results.pSuccess*100) '% success = ' num2str(results.H1.N.min) ]);
         h.HorizontalAlignment = 'Center';
         for i=allAx(:)'
             % Show evidence boundary
