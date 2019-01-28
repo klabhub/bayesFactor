@@ -6,7 +6,7 @@
    <!--
 This HTML was auto-generated from MATLAB code.
 To make changes, update the MATLAB code and republish this document.
-      --><title>Getting Started with the bayesFactor Toolbox</title><meta name="generator" content="MATLAB 9.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2019-01-28"><meta name="DC.source" content="index.m"><style type="text/css">
+      --><title>Getting Started with the bayesFactor Toolbox</title><meta name="generator" content="MATLAB 9.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2019-01-28"><meta name="DC.source" content="gettingStarted.m"><style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
 
 html { min-height:100%; margin-bottom:1px; }
@@ -116,48 +116,42 @@ ans =
 </pre><pre class="codeoutput">
 bfFull =
 
-   12.3701
+   12.2025
 
 </pre><p>To specifically look at the evidence for a main effect of orientation, we need to compare the Bayes Factor of the full model to a restricted model in which everything except the main effect of orientation is kept.</p><pre class="codeinput">bfRestricted  =   bf.anova(data,<span class="string">'rt~freq +ori:freq'</span>);  <span class="comment">% Keep main of freq and ori:freq interaction.</span>
 </pre><p>The evidence for the main effect is the ratio of the Bayes Factors.</p><pre class="codeinput">bfMain = bfFull/bfRestricted
 </pre><pre class="codeoutput">
 bfMain =
 
-  179.6498
+  177.2155
 
 </pre><p>The evidence is overwhelmingly in favor of a main effect of orientation.</p><h2 id="19">Figures from Rouder et al. 2012</h2><p>Much of the mathematical basis for this package is developed in the Rouder et al. paper. To test the package, I recreated some of the figures in their publication.</p><p>Figure 2 in Rouder et al compares critical T-values for a traditional t-test with a Bayes Factor analysis.</p><pre class="codeinput">rouderFigure2;
-</pre><img vspace="5" hspace="5" src="index_01.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput">rouderFigure4(1000); <span class="comment">% Use 1000 bootstrap sets .</span>
-</pre><img vspace="5" hspace="5" src="index_02.png" alt=""> <p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput">rouderFigure5;
-</pre><img vspace="5" hspace="5" src="index_03.png" alt=""> <h2 id="22">Bayes Factor Design Analysis - Figures from Schoenbrodt &amp; Wagenmakers</h2><p>This paper provides a tutorial treatment of Bayes Factor Design Analysis.  Please see <tt>schoenbrodtFigures.m</tt> for details.</p><pre class="codeinput"><span class="comment">% Figure 3 in S&amp;W analyzes a Fixed-N design for a T-test.</span>
-schoenbrodtFigures(3,10000); <span class="comment">% 10000 Monte Carlo sims</span>
+</pre><img vspace="5" hspace="5" src="gettingStarted_01.png" alt=""> <p>Figure 4 shows Bayes Factor analysis for simulated data with different effect sizes.</p><pre class="codeinput">rouderFigure4(100); <span class="comment">% Use 1000 bootstrap sets .</span>
+</pre><img vspace="5" hspace="5" src="gettingStarted_02.png" alt=""> <p>Figure 5 illustrates the influence of fixed and random effects</p><pre class="codeinput">rouderFigure5;
+</pre><img vspace="5" hspace="5" src="gettingStarted_03.png" alt=""> <h2 id="22">Bayes Factor Design Analysis - Figures from Schoenbrodt &amp; Wagenmakers</h2><p>This paper provides a tutorial treatment of Bayes Factor Design Analysis.  Please see <tt>schoenbrodtFigures.m</tt> for details.</p><pre class="codeinput"><span class="comment">% Figure 3 in S&amp;W analyzes a Fixed-N design for a T-test.</span>
+schoenbrodtFigures(3,1000); <span class="comment">% 10000 Monte Carlo sims</span>
 </pre><pre class="codeoutput">***************
-N = 20
-False Positives (%): 0
-False Negatives (%): 0
-True Positives (%) 0
-True Negatives (%) 0
-***************
-N = 100
-False Positives (%): 0
-False Negatives (%): 0
-True Positives (%) 100
-True Negatives (%) 0
+N = 20  100
+False Positives (%): 0.8         0.3
+False Negatives (%): 1.4           0
+True Positives (%) 22         83.5
+True Negatives (%) 20.2         54.8
 **************
-Necessary sample size for 95% success under H1 is 143
-False negative rate under that scenario: 0
-False positive rate under H0: 0.47
-True negative rate under H0: 61.13
-</pre><img vspace="5" hspace="5" src="index_04.png" alt=""> <p>Figure 4 in S&amp;@ analyzes a Bayes sequential sampling design.</p><pre class="codeinput">schoenbrodtFigures(4,10000); <span class="comment">% 10000 Monte Carlo sims</span>
-</pre><pre class="codeoutput">False Positive Rate: 85.63%
-False Negative Rate: 3.49%
-Median Sample Size (H1): 40
-Median Sample Size (H0): 41
-</pre><img vspace="5" hspace="5" src="index_05.png" alt=""> <p>Figure 5 refines the Sequential design analysis</p><pre class="codeinput">schoenbrodtFigures(5,10000); <span class="comment">% 10000 Monte Carlo sims</span>
-</pre><pre class="codeoutput">False Positive Rate: 71.48%
-False Negative Rate: 1.32%
-Median Sample Size (H1): 75
+Necessary sample size for 95% success under H1 is Inf
+False Positives (%): 0.6         0.4         0.4         0.3         0.3         0.2         0.5         0.4         0.6         0.4         0.6         0.2         0.4
+False Negatives (%): 0.1           0           0           0           0           0           0           0           0           0           0         0.1           0
+True negative  (%): 53.6         55.3         59.7         62.6         61.4         63.5         61.9         61.9         62.7         63.4         61.6         61.2         63.3
+</pre><img vspace="5" hspace="5" src="gettingStarted_04.png" alt=""> <p>Figure 4 in S&amp;@ analyzes a Bayes sequential sampling design.</p><pre class="codeinput">schoenbrodtFigures(4,1000); <span class="comment">% 10000 Monte Carlo sims</span>
+</pre><pre class="codeoutput">False Positive Rate: 87%
+False Negative Rate: 1.3%
+Median Sample Size (H1): 35
+Median Sample Size (H0): 42
+</pre><img vspace="5" hspace="5" src="gettingStarted_05.png" alt=""> <p>Figure 5 refines the Sequential design analysis</p><pre class="codeinput">schoenbrodtFigures(5,1000); <span class="comment">% 10000 Monte Carlo sims</span>
+</pre><pre class="codeoutput">False Positive Rate: 70.4%
+False Negative Rate: 0.7%
+Median Sample Size (H1): 66
 Median Sample Size (H0): 55
-</pre><img vspace="5" hspace="5" src="index_06.png" alt=""> <p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
+</pre><img vspace="5" hspace="5" src="gettingStarted_06.png" alt=""> <p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018b</a><br></p></div><!--
 ##### SOURCE BEGIN #####
 %% Getting Started with the bayesFactor Toolbox
 %% Description
@@ -294,7 +288,7 @@ rouderFigure2;
 % Figure 4 shows Bayes Factor analysis for simulated data with different 
 % effect sizes.
 % 
-rouderFigure4(1000); % Use 1000 bootstrap sets . 
+rouderFigure4(100); % Use 1000 bootstrap sets . 
 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
@@ -306,18 +300,18 @@ rouderFigure5;
 %  Please see |schoenbrodtFigures.m| for details.
 
 % Figure 3 in S&W analyzes a Fixed-N design for a T-test.
-schoenbrodtFigures(3,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(3,1000); % 10000 Monte Carlo sims
 
 %%
 %
 % Figure 4 in S&@ analyzes a Bayes sequential sampling design.
-schoenbrodtFigures(4,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(4,1000); % 10000 Monte Carlo sims
 
 %%
 % 
 % Figure 5 refines the Sequential design analysis
 
-schoenbrodtFigures(5,10000); % 10000 Monte Carlo sims
+schoenbrodtFigures(5,1000); % 10000 Monte Carlo sims
 
 ##### SOURCE END #####
 --></body></html>

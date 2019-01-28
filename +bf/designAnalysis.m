@@ -299,7 +299,7 @@ if p.Results.plot
             toPlot(toPlot<lowerBF) = lowerBF;
             if size(toPlot,1)>100
                 % Limit to 100 trajectories
-                toPlot100 = toPlot(randsample(size(toPlot,2),100),:);
+                toPlot100 = toPlot(randsample(size(toPlot,1),100),:);
             else
                 toPlot100 = toPlot;
             end                
