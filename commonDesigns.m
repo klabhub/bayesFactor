@@ -6,7 +6,7 @@
 %% General parameter settings
 nrSimulatedExperiments = 100;
 sampleSizes = [50];
-testToSimulate = '2WAYRMMAIN';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
+testToSimulate = '2WAYRMINT';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
 nrSampleSizes= numel(sampleSizes);
 scale =sqrt(1/2);
 bayesFactor = nan(nrSampleSizes,nrSimulatedExperiments);
@@ -52,13 +52,15 @@ switch upper(testToSimulate)
         nrFactors = numel(levels);
         for j = 1:nrSampleSizes
             for i=1:nrSimulatedExperiments
+                fac1 = repmat((1:levels(1))',[1 levels(2)]);
+                fac2 = repmat(1:levels(2),[levels(1) 1 ]);
                 first = effectSize*randn([levels(1) 1]);
                 second = effectSize*randn([1 levels(2)]);
-                interaction = effectSize*randn(levels);
+                interaction = effectSize.*fac1.*fac2;
                 singleSubject = repmat(first,[1 levels(2)]) + repmat(second,[levels(1) 1]) + interaction;
                 response = reshape(repmat(singleSubject,[1 1 sampleSizes(j)])+ randn([levels sampleSizes(j)]),[prod(levels)*sampleSizes(j) 1]);
-                fac1 = reshape(repmat((1:levels(1))',[1 levels(2) sampleSizes(j)]),[prod(levels)*sampleSizes(j) 1]);
-                fac2 = reshape(repmat(1:levels(2),[levels(1) 1 sampleSizes(j)]),[prod(levels)*sampleSizes(j) 1]);
+                fac1 = reshape(repmat(fac1,[1 1 sampleSizes(j)]),[prod(levels)*sampleSizes(j) 1]);
+                fac2 = reshape(repmat(fac2,[1 1 sampleSizes(j)]),[prod(levels)*sampleSizes(j) 1]);
                 subject = reshape(repmat((1:sampleSizes(j)),[prod(levels) 1 ]),[prod(levels)*sampleSizes(j) 1]);
                 tbl = table(response,fac1,fac2,subject);
                 switch upper(testToSimulate)
@@ -91,8 +93,8 @@ switch upper(testToSimulate)
                 end
             end
             consistency =100*mean(sign(log10(bayesFactor(j,:)))==sign(log10(bayesFactorBIC(j,:))));
-            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactor(:,j))),median(log10(bayesFactor(:,j))),max(log10(bayesFactor(:,j))),consistency)
-            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactorBIC(:,j))),median(log10(bayesFactorBIC(:,j))),max(log10(bayesFactorBIC(:,j))),consistency)
+            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactor(:,j))),nanmedian(log10(bayesFactor(:,j))),max(log10(bayesFactor(:,j))),consistency)
+            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactorBIC(:,j))),nanmedian(log10(bayesFactorBIC(:,j))),max(log10(bayesFactorBIC(:,j))),consistency)
         end
         
 end
