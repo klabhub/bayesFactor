@@ -44,7 +44,7 @@ for i=1:nrAllTerms
         % A main term
         thisX = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},opts{:});
         % Sum-to-zero contrasts that equates marginal priors across levels.
-        if p.Results.zeroSumConstraint
+         if ~ismember(allTerms{i},p.Results.treatAsRandom) && p.Results.zeroSumConstraint           
             thisX = bf.internal.zeroSumConstraint(thisX);
         end
     end

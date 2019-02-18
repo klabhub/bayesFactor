@@ -14,6 +14,8 @@ nrEffects = size(X,2);
 p =inputParser;
 p.addParameter('sharedPriors',{},@iscell); % Which effects share a prior? A cell array with indices corresponding to columns of X
 p.addParameter('options',bf.options);
+p.addParameter('scale',1); 
+p.addParameter('almostZero',0.00001); % Integrating from zero can cause problems. Start at something not quite zero. (This is effect size so this is 0 for practical purposes)
 p.parse(varargin{:});
 
 if isempty(p.Results.sharedPriors)
@@ -22,7 +24,7 @@ else
     sharedPriors = p.Results.sharedPriors;
 end
 
-prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,1));
+prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,p.Results.scale));
 integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),1));
 nrDims = numel(sharedPriors);
 if nrDims>= p.Results.options.nDimsForMC
@@ -31,11 +33,11 @@ if nrDims>= p.Results.options.nDimsForMC
 else
     switch (nrDims)
         case 1
-            bf10 = integral(integrand,0,Inf);
+            bf10 = integral(integrand,p.Results.almostZero,Inf);
         case 2
-            bf10 = integral2(integrand,0,Inf,0,Inf);
+            bf10 = integral2(integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
         case 3
-            bf10 = integral3(integrand,0,Inf,0,Inf,0,Inf);
+            bf10 = integral3(integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
     end
 end
 end

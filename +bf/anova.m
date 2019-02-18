@@ -50,6 +50,7 @@ p=inputParser;
 p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.
 p.addParameter('treatAsRandom',{});
 p.addParameter('options',bf.options);
+p.addParameter('scale',1); 
 p.parse(args{:});
 
 
@@ -98,7 +99,7 @@ else
 end
 %% Call the nWayAnova function for the actual analysis
 X= [X{:}];
-bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',sharedPriorIx,'options',p.Results.options);
+bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',sharedPriorIx,'options',p.Results.options,'scale',p.Results.scale);
 end
 
 
