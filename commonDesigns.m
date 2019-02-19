@@ -5,16 +5,21 @@
 
 %% General parameter settings
 nrSimulatedExperiments = 1000;
-sampleSizes = [50];
+sampleSizes = [10 20 50];
 testToSimulate = '2WAYRMMAIN';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
 nrSampleSizes= numel(sampleSizes);
-scale =sqrt(1/2);
+scale =1;
 bayesFactor = nan(nrSampleSizes,nrSimulatedExperiments);
 bayesFactorBIC = nan(nrSampleSizes,nrSimulatedExperiments);
 pValue = nan(nrSampleSizes,nrSimulatedExperiments);
 stat =  nan(nrSampleSizes,nrSimulatedExperiments);
-effectSize = 0.35;
+effectSize = 0.25;
+tic;nn=0;
 
+if ~exist('showTimeToCompletion.m','file')
+    % Showtimetocompletion is a function outside the toolbox -do nothing
+    showTimeToCompletion = @(x,y)(1); %NOP
+end
 switch upper(testToSimulate)
     case 'TTEST'
         %% Two-Sample T Test
@@ -22,10 +27,11 @@ switch upper(testToSimulate)
             for j = 1:nrSampleSizes
                 X = randn([sampleSizes(j) 1]);
                 Y = randn([sampleSizes(j) 1])+effectSize;
-                [bayesFactor(j,k,i),pValue(j,k,i),~,stats] = bf.ttest2(X,Y,'scale',scale);
-                [bayesFactorBIC(j,k,i)] = bf.bfFromT(stats.tstat,stats.df,sampleSizes(j)); % Calculate BIC approximation
+                [bayesFactor(j,i),pValue(j,i),~,stats] = bf.ttest2(X,Y,'scale',scale);
+                [bayesFactorBIC(j,i)] = bf.bfFromT(stats.tstat,stats.df); % Calculate BIC approximation
                 stat(j,i) = stats.tstat;
-            end
+                nn = showTimeToCompletion(((i-1)*nrSampleSizes+j)/(nrSimulatedExperiments*nrSampleSizes),nn);          
+            end            
         end
     case '1WAY'
         %% 1-WAY ANOVA - main effect
@@ -41,19 +47,19 @@ switch upper(testToSimulate)
                 [bayesFactor(j,i),lme] = bf.anova(tbl,'y~X','scale',scale);
                 
                 tmp =anova(lme);
-                pValue(j,k,i) =tmp.pValue(2); % pValue of the Main factor
-                stat(j,k,i) = tmp.FStat(2);
-                [bayesFactorBIC(j,k,i)] = bf.bfFromF(tmp.FStat(2),tmp.DF1(2),tmp.DF2(2),sampleSizes(j));
-            end
+                pValue(j,i) =tmp.pValue(2); % pValue of the Main factor
+                stat(j,i) = tmp.FStat(2);
+                df1 = nrLevels-1;
+                df2 = nrLevels*(sampleSizes(j)-1);
+                [bayesFactorBIC(j,i)] = bf.bfFromF(tmp.FStat(2),df1,df2,sampleSizes(j));
+                nn = showTimeToCompletion(((i-1)*nrSampleSizes+j)/(nrSimulatedExperiments*nrSampleSizes),nn);                        end
         end
     case {'2WAYRMMAIN','2WAYRMINT'}
         %%
         levels = [2 3];
         nrFactors = numel(levels);
-        tic;nn=0;
-        for j = 1:nrSampleSizes
-            for i=1:nrSimulatedExperiments
-                nn = showTimeToCompletion(((j-1)*nrSimulatedExperiments+i)/(nrSimulatedExperiments*nrSampleSizes),nn);
+        for i=1:nrSimulatedExperiments
+            for j = 1:nrSampleSizes
                 fac1 = repmat((1:levels(1))',[1 levels(2)]);
                 fac2 = repmat(1:levels(2),[levels(1) 1 ]);
                 first = effectSize*randn([levels(1) 1]);
@@ -93,10 +99,11 @@ switch upper(testToSimulate)
                         df2 = df1*(sampleSizes(j)-1);
                         bayesFactorBIC(j,i) = bf.bfFromF(stat(j,i),df1,df2,sampleSizes(j));
                 end
+                nn = showTimeToCompletion(((i-1)*nrSampleSizes+j)/(nrSimulatedExperiments*nrSampleSizes),nn);
             end
-            consistency =100*mean(sign(log10(bayesFactor(j,:)))==sign(log10(bayesFactorBIC(j,:))));
-            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactor(:,j))),nanmedian(log10(bayesFactor(:,j))),max(log10(bayesFactor(:,j))),consistency)
-            sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactorBIC(:,j))),nanmedian(log10(bayesFactorBIC(:,j))),max(log10(bayesFactorBIC(:,j))),consistency)
+            %             consistency =100*mean(sign(log10(bayesFactor(j,:)))==sign(log10(bayesFactorBIC(j,:))));
+            %             sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactor(:,j))),nanmedian(log10(bayesFactor(:,j))),max(log10(bayesFactor(:,j))),consistency)
+            %             sprintf('%.2f %.2f %.2f %.2f %.2f %%',effectSize(1),min(log10(bayesFactorBIC(:,j))),nanmedian(log10(bayesFactorBIC(:,j))),max(log10(bayesFactorBIC(:,j))),consistency)
         end
         
 end
@@ -109,7 +116,7 @@ end
 % 2 - compare stat (F or T) with BF
 % 3 -  compare BIC approximation with BF
 
-figure(1);clf
+figure;clf
 minP = 1e-4;
 maxP = 0.1;
 h = nan(nrSampleSizes,1);
@@ -167,4 +174,4 @@ plot(bfLim,bfLim,'k--')
 title 'Comparing BF with BIC Approximation'
 
 
-save 
+save
