@@ -6,14 +6,14 @@
 %% General parameter settings
 nrSimulatedExperiments = 1000;
 sampleSizes = [50];
-testToSimulate = '2WAYRMINT';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
+testToSimulate = '2WAYRMMAIN';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
 nrSampleSizes= numel(sampleSizes);
 scale =sqrt(1/2);
 bayesFactor = nan(nrSampleSizes,nrSimulatedExperiments);
 bayesFactorBIC = nan(nrSampleSizes,nrSimulatedExperiments);
 pValue = nan(nrSampleSizes,nrSimulatedExperiments);
 stat =  nan(nrSampleSizes,nrSimulatedExperiments);
-effectSize = 0.5;
+effectSize = 0.35;
 
 switch upper(testToSimulate)
     case 'TTEST'
@@ -50,8 +50,10 @@ switch upper(testToSimulate)
         %%
         levels = [2 3];
         nrFactors = numel(levels);
+        tic;nn=0;
         for j = 1:nrSampleSizes
             for i=1:nrSimulatedExperiments
+                nn = showTimeToCompletion(((j-1)*nrSimulatedExperiments+i)/(nrSimulatedExperiments*nrSampleSizes),nn);
                 fac1 = repmat((1:levels(1))',[1 levels(2)]);
                 fac2 = repmat(1:levels(2),[levels(1) 1 ]);
                 first = effectSize*randn([levels(1) 1]);
@@ -163,3 +165,6 @@ xlabel 'Bayes Factor'
 set(gca,'XScale','log','YScale','Log','XLim',bfLim,'YLim',bfLim);
 plot(bfLim,bfLim,'k--')
 title 'Comparing BF with BIC Approximation'
+
+
+save 
