@@ -4,7 +4,7 @@
 % p-value is given the N, this script simulates some of those tests.
 
 %% General parameter settings
-nrSimulatedExperiments = 100;
+nrSimulatedExperiments = 1000;
 sampleSizes = [50];
 testToSimulate = '2WAYRMINT';   % Pick one from 'TTEST','1WAY',2WAYRMMAIN 2WAYRMINT
 nrSampleSizes= numel(sampleSizes);
