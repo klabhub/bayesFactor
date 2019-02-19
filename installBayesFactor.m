@@ -11,4 +11,7 @@ pth = fileparts(filename);
 addpath(pth)
 savepath;
 
+% Store the default options as prefs on this machine. 
+% The user can change these with bf.options
+bf.options; 
 end
