@@ -172,6 +172,3 @@ xlabel 'Bayes Factor'
 set(gca,'XScale','log','YScale','Log','XLim',bfLim,'YLim',bfLim);
 plot(bfLim,bfLim,'k--')
 title 'Comparing BF with BIC Approximation'
-
-
-save
