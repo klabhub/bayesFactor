@@ -30,9 +30,9 @@ a =anova(lm)
 % Now do BF analysis
 % First calculate BF for the model with group effect, and random effects ID
 % and ID:group interaction (mimicking what R does with Error(ID/group)
-[bfWithMain] = bf.anova(sleep,'extra~group+ID+group:ID','treatAsRandom',{'ID','group:ID'});
+[bfWithMain] = bf.anova(sleep,'extra~group+ID+group:ID','treatAsRandom',{'ID','group:ID'},'scale',1);
 % Then fit a model with only the random effects
-[bfRestricted] = bf.anova(sleep,'extra~ID+group:ID','treatAsRandom',{'ID','group:ID'});
+[bfRestricted] = bf.anova(sleep,'extra~ID+group:ID','treatAsRandom',{'ID','group:ID'},'scale',1);
 % Take the ratio to quantify the evidence in favor of the main (fixed) effect of
 % group.  Morey calculates the as ~11.6. I get 11.15 using gaussian
 % quadrature. 

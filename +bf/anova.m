@@ -50,7 +50,7 @@ p=inputParser;
 p.addParameter('sharedPriors','within',@(x) ischar(x) || (iscell(x) && iscell(x{1}))); % Cell containing cells with factors(columns) that share a prior.
 p.addParameter('treatAsRandom',{});
 p.addParameter('options',bf.options);
-p.addParameter('scale',1); 
+p.addParameter('scale',sqrt(2)/2); 
 p.parse(args{:});
 
 

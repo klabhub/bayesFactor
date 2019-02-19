@@ -14,7 +14,7 @@ nrEffects = size(X,2);
 p =inputParser;
 p.addParameter('sharedPriors',{},@iscell); % Which effects share a prior? A cell array with indices corresponding to columns of X
 p.addParameter('options',bf.options);
-p.addParameter('scale',1); 
+p.addParameter('scale',sqrt(2)/2); 
 p.addParameter('almostZero',0.00001); % Integrating from zero can cause problems. Start at something not quite zero. (This is effect size so this is 0 for practical purposes)
 p.parse(varargin{:});
 

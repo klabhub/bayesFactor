@@ -1,4 +1,4 @@
-function y = cauchy(x,scale,location)
+function y = cauchyPdf(x,scale,location)
 % Cauchy probability density function 
 % 
 % INPUT 

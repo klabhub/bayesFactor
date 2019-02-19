@@ -8,7 +8,6 @@ function y = scaledInverseChiPdf(x,df,scale)
 % y = The probaility density
 %
 % BK - 2018
-%assert(all(x>0),'The scaled inverse Chi-squared PDF is only defined for x>0')
 z = x<0;
 y = zeros(size(z));
 if nargin <3
