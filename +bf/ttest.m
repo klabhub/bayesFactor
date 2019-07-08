@@ -33,7 +33,7 @@ if isnumeric(X)
     else
         % X and Y specified
         if numel(varargin)>1
-            parms = varargin{2:end};
+            parms = varargin(2:end);
         else
             parms = {};
         end
