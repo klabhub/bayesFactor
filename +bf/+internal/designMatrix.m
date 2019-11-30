@@ -9,7 +9,7 @@ function [X,y] = designMatrix(lm,allTerms,varargin)
 % ZeroSumConstraint -  Toggle to apply the zero sum constraint to
 %                   each factor (This equates the marginal prior across terms in the
 %                           factor; see Rouder et al) [true]
-% treatAsRandom  - A cell array of factors which should be
+% treatAsRandom  - A char or a cell array of chars with factors that should be
 %               treated as random (i.e. not fixed) effects.
 %               [{}].
 % OUTPUT
@@ -19,13 +19,17 @@ function [X,y] = designMatrix(lm,allTerms,varargin)
 
 p = inputParser;
 p.addParameter('zeroSumConstraint',true,@islogical);
-p.addParameter('treatAsRandom',{},@iscell);
+p.addParameter('treatAsRandom',{},@(x) ischar(x) || iscell(x));
 p.parse(varargin{:});
+treatAsRandom =p.Results.treatAsRandom;
+if ischar(treatAsRandom);treatAsRandom = {treatAsRandom};end
 
 nrAllTerms =numel(allTerms);
 X = cell(1,nrAllTerms);
 isCategorical=  ~ismember(lm.Variables.Properties.VariableNames,lm.ResponseName);
 opts = {'model','linear','categoricalvars',isCategorical,'intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
+
+
 for i=1:nrAllTerms
     if any(allTerms{i}==':')
         % An interaction term.
@@ -33,10 +37,10 @@ for i=1:nrAllTerms
         bName = extractAfter(allTerms{i},':');
         thisA = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',aName,opts{:});
         thisB = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',bName,opts{:});
-        if ~ismember(aName,p.Results.treatAsRandom) && p.Results.zeroSumConstraint
+        if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint
             thisA = bf.internal.zeroSumConstraint(thisA);
         end
-        if ~ismember(bName,p.Results.treatAsRandom) && p.Results.zeroSumConstraint
+        if ~ismember(bName,treatAsRandom) && p.Results.zeroSumConstraint
             thisB = bf.internal.zeroSumConstraint(thisB);
         end
         thisX = bf.internal.interaction(thisA,thisB);
@@ -44,7 +48,7 @@ for i=1:nrAllTerms
         % A main term
         thisX = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},opts{:});
         % Sum-to-zero contrasts that equates marginal priors across levels.
-         if ~ismember(allTerms{i},p.Results.treatAsRandom) && p.Results.zeroSumConstraint           
+         if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint           
             thisX = bf.internal.zeroSumConstraint(thisX);
         end
     end

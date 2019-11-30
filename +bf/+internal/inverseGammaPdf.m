@@ -4,10 +4,21 @@ function y = inverseGammaPdf(x,alpha,beta)
 % x  (>0)
 % alpha - shape parameter
 % beta  - scale parameter
-%
+% OUTPUT
+% y = the pdf [nrX nrBeta]
 % BK - 2018
-%assert(all(x>0),'The inverse gamma PDF is only defined for x>0')
+if isvector(x);x=x(:);end % Force col
+nrX = size(x,1);
+nrBeta = numel(beta);
+if isvector(beta) && nrBeta>1
+    beta = beta(:)'; % Force row
+    beta =repmat(beta,[nrX  1]);
+end
+if isvector(x)
+    x = repmat(x,[1 nrBeta]);
+end
 z = x<0;
-y = zeros(size(z));
-y(~z) = (beta.^alpha)/gamma(alpha)*(1./x(~z)).^(alpha+1).*exp(-beta./x(~z));
+x(z) =NaN;
+y = (beta.^alpha)./gamma(alpha).*(1./x).^(alpha+1).*exp(-beta./x);
+y(z) = 0;
 end

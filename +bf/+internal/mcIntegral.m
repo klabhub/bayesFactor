@@ -13,16 +13,18 @@ function v = mcIntegral(fun,prior,nrDims,options)
 
 
 %% Setup the PDF to do importance sampling
-gRange =  options.minG:options.stepG:options.maxG;
+gRange =  (options.minG:options.stepG:options.maxG)';
 pdf = prior(gRange);
 pdf = pdf./sum(pdf);
 % Draw samples weighted by this prior.
-g =nan(nrDims,options.nrSamples);
+g =nan(options.nrSamples,nrDims);
+nrPdfs = size(pdf,2);
 for d=1:nrDims
-    g(d,:) = randsample(gRange,options.nrSamples,true,pdf);
+    pdfCol = min(nrPdfs,d); 
+    g(:,d) = randsample(gRange,options.nrSamples,true,pdf(:,pdfCol));
 end
 %% Evaluate the function at these g values
 bf10Samples = fun(g);
-pg = prod(prior(g),1);  % Probability of each g combination
+pg = prod(prior(g),2);  % Probability of each g combination
 v = mean(bf10Samples./pg); % Expectation value- = integral.
 end

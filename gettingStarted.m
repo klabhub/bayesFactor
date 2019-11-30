@@ -118,7 +118,50 @@ bfMain = bfFull/bfRestricted
 %% 
 % The evidence is overwhelmingly in favor of a main effect of orientation.
 % 
-%     
+% 
+
+%% Repeated Measurements
+% The experiment Rouder et al describe took repeated measurements from the
+% same subject (for each orientation and frequency), but this is not used
+% in the analysis above. If there was large intersubject variability
+% (e.g. some subjects have an overall slow reaction time) then this could reduce 
+% the power of the statistical test to detect an effect of orientation. In
+% the example data set there isn't much variation across subjects, so let's
+% introduce some variation to illustrate this.
+load rouder2012Data
+slowSubjects = ismember(data.subject,[1 4 6]); % Lets make subjects 1 4 and 6 slower overall by 0.25s .
+data{slowSubjects,'rt'} = data.rt(slowSubjects)+0.25; 
+% Calculate the BF and LMM model again
+[bfFull,modelFull] = bf.anova(data,'rt~ori*freq');
+bfFull
+anova(modelFull)
+% That does not seem right;  the effect of orientation on RT has been
+% unchanged, yet both the BF and the anova show that the effect is no
+% longer significant. 
+%
+% Of course, what is missing is a repeated measures approach. With linear mixed models
+% this is done by including an extra term in the model that captures the
+% idiosyncratic offset in the RT for each subject. In the Wilcoxon formula
+% this is written as (1|subject) : fit a constant term (1) for each level
+% of subject.
+
+[bfFull,modelFull] = bf.anova(data,'rt~ori*freq + (1|subject)');
+bfFull
+anova(modelFull)
+
+% This shows that after including the intercept term for subjects, the
+% Bayes Factor is increased substantially (as are the F values in the ANOVA).
+
+%Isolating a main effect while using hte repeated measures aspect of the design
+%works analogously:
+
+bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');  % Keep main of freq and ori:freq interaction.
+%% 
+% The evidence for the main effect is the ratio of the Bayes Factors. 
+
+bfMain = bfFull/bfRestricted
+
+
 %% Figures from Rouder et al. 2012
 % Much of the mathematical basis for this package is developed in the Rouder 
 % et al. paper. To test the package, I recreated some of the figures in their 

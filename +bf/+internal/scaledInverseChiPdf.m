@@ -5,13 +5,26 @@ function y = scaledInverseChiPdf(x,df,scale)
 % df = degrees of freedom
 % scale = scale (tau squared).
 % OUTPUT
-% y = The probaility density
+% y = The probaility density [nrX nrScales]
 %
 % BK - 2018
-z = x<0;
-y = zeros(size(z));
 if nargin <3
     scale =1; % Default to scaled inverse Chi-squared.
 end
-y(~z) = bf.internal.inverseGammaPdf(x(~z),df/2,df*scale/2);
+
+nrX = size(x,1);
+nrScale = numel(scale);
+if isvector(scale) && nrScale>1
+    scale = scale(:)'; %Force Row
+    scale =repmat(scale,[nrX 1 ]);
+end
+if isvector(x) && nrScale >1
+    x = x(:); %Force col
+    x = repmat(x,[1 nrScale]);
+end
+z = x<0;
+x(z) =NaN;
+
+y = bf.internal.inverseGammaPdf(x,df/2,df.*scale/2);
+y(z) = 0;
 end

@@ -8,14 +8,17 @@ function bf10 = nWayAnova(y,X,varargin)
 % 'sharedPriors'  - Cell array of vectors indicating which effects (columns
 % of X) share the same prior. [{1:nrEffects}]: all effects share the same prior.
 % 'options' - Monte Carlo integration and parrallel computation optionss. [bf.options]
+% 'scale', - The scale of the prior. A scalar (applied to all) or a vector
+% matching the number of columns in the design matrix X. [sqrt(2)/2]
+% 'almostZero' - Improve integration by not including zero itself [0.00001];
 % BK 2018
 nrEffects = size(X,2);
 
 p =inputParser;
 p.addParameter('sharedPriors',{},@iscell); % Which effects share a prior? A cell array with indices corresponding to columns of X
 p.addParameter('options',bf.options);
-p.addParameter('scale',sqrt(2)/2); 
-p.addParameter('almostZero',0.00001); % Integrating from zero can cause problems. Start at something not quite zero. (This is effect size so this is 0 for practical purposes)
+p.addParameter('scale',sqrt(2)/2,@isnumeric); 
+p.addParameter('almostZero',0.00001,@isnumeric); % Integrating from zero can cause problems. Start at something not quite zero. (This is effect size so this is 0 for practical purposes)
 p.parse(varargin{:});
 
 if isempty(p.Results.sharedPriors)
@@ -24,9 +27,16 @@ else
     sharedPriors = p.Results.sharedPriors;
 end
 
-prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,p.Results.scale));
-integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),1));
 nrDims = numel(sharedPriors);
+scale =p.Results.scale;
+if numel(scale)==1
+    % Single scale applies to all.
+elseif numel(scale) ~=nrDims
+    error('The number of scale elements (%d) does not match the number shared priors (%d)',numel(scale),nrDims);
+end
+prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,scale));
+integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),2));
+
 if nrDims>= p.Results.options.nDimsForMC
     % Use MC Sampling to calculate the integral
     bf10 = bf.internal.mcIntegral(integrand,prior,nrDims,p.Results.options);
