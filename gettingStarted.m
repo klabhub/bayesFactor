@@ -16,13 +16,13 @@
 % papers:
 % 
 % *  Rouder, J. N., Morey, R. D., Speckman, P. L. & Province, J. M. Default 
-% Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356–374 (2012).
-% *  Kass, R. E. & Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733–795 
+% Bayes factors for ANOVA designs. J. Math. Psychol. 56, 356?374 (2012).
+% *  Kass, R. E. & Raftery, A. E. Bayes factors. J. Am. Stat. Soc. 90, 733?795 
 % (1995).
 % *  Morey, R. D. & Wagenmakers, E. J. Simple relation between Bayesian order-restricted 
-% and point-null hypothesis tests. Stat. Probab. Lett. 92, 121–124 (2014).
+% and point-null hypothesis tests. Stat. Probab. Lett. 92, 121?124 (2014).
 % *  Schoenbrodt, F. D. & Wagenmakers, E. J. Bayes factor design analysis: Planning 
-% for compelling evidence. Psychon. Bull. Rev. 1–15 (2017). doi:10.3758/s13423-017-1230-y
+% for compelling evidence. Psychon. Bull. Rev. 1?15 (2017). doi:10.3758/s13423-017-1230-y
 %% System Requirements 
 % This toolbox depends on the Mathworks <https://www.mathworks.com/products/statistics.html 
 % Statistics and Machine Learning Toolbox >
@@ -121,6 +121,7 @@ bfMain = bfFull/bfRestricted
 % 
 
 %% Repeated Measurements
+%%
 % The experiment Rouder et al describe took repeated measurements from the
 % same subject (for each orientation and frequency), but this is not used
 % in the analysis above. If there was large intersubject variability
@@ -128,15 +129,20 @@ bfMain = bfFull/bfRestricted
 % the power of the statistical test to detect an effect of orientation. In
 % the example data set there isn't much variation across subjects, so let's
 % introduce some variation to illustrate this.
+
 load rouder2012Data
 slowSubjects = ismember(data.subject,[1 4 6]); % Lets make subjects 1 4 and 6 slower overall by 0.25s .
 data{slowSubjects,'rt'} = data.rt(slowSubjects)+0.25; 
+
+%%
 % Calculate the BF and LMM model again
 [bfFull,modelFull] = bf.anova(data,'rt~ori*freq');
 bfFull
 anova(modelFull)
-% That does not seem right;  the effect of orientation on RT has been
-% unchanged, yet both the BF and the anova show that the effect is no
+
+%%
+% That does not seem right; we did not change how orientation affects RT 
+% and yet both the BF and the anova show that the effect is no
 % longer significant. 
 %
 % Of course, what is missing is a repeated measures approach. With linear mixed models
@@ -149,18 +155,21 @@ anova(modelFull)
 bfFull
 anova(modelFull)
 
+%%
 % This shows that after including the intercept term for subjects, the
 % Bayes Factor is increased substantially (as are the F values in the ANOVA).
+%
+% Isolating a main effect while using hte repeated measures aspect of the design
+% works analogously:
 
-%Isolating a main effect while using hte repeated measures aspect of the design
-%works analogously:
+bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');  
 
-bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');  % Keep main of freq and ori:freq interaction.
 %% 
 % The evidence for the main effect is the ratio of the Bayes Factors. 
+% the difference withbefore is that now both BF have been calculated with
+% the subject random intercept.
 
 bfMain = bfFull/bfRestricted
-
 
 %% Figures from Rouder et al. 2012
 % Much of the mathematical basis for this package is developed in the Rouder 
