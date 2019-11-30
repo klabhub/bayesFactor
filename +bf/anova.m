@@ -91,7 +91,7 @@ for grp = 1:numel(f.GroupingVariableNames)
     end
     reX = cat(2,reX,thisReX);
     reTerms = cat(2,reTerms,{thisTerms});
-    reSharedPriors = cat(2,reSharedPriors,f.GroupingVariableNames{grp});    
+    reSharedPriors = cat(2,reSharedPriors,{thisTerms});    
 end
 nrReTerms = numel(reTerms);
 if isscalar(p.Results.randomEffectsScale)
@@ -139,6 +139,8 @@ fullSharedPriorIx = bf.internal.sharedPriorIx(X,fullTerms,fullSharedPriors);
 %% Call the nWayAnova function for the actual analysis
 X= [X{:}];
 bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',fullSharedPriorIx,'options',p.Results.options,'scale',fullScale);
+
+%% Correct for RE if any
 if nrReTerms >0
     % If Random Effects were specified, fit a model with only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
