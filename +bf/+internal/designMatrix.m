@@ -26,9 +26,10 @@ if ischar(treatAsRandom);treatAsRandom = {treatAsRandom};end
 
 nrAllTerms =numel(allTerms);
 X = cell(1,nrAllTerms);
-isCategorical=  ~ismember(lm.Variables.Properties.VariableNames,lm.ResponseName);
-opts = {'model','linear','categoricalvars',isCategorical,'intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
-
+%Options for modelutils.designmatrix . Its internal alg determines which
+%vars are categorical quite well. But use categorical() in the data table
+%to be sure (or chars/strings).
+opts = {'model','linear','intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
 
 for i=1:nrAllTerms
     if any(allTerms{i}==':')

@@ -1,4 +1,4 @@
-function out = simulateLinearModel(o,lm,effectSize,N)
+function out = simulateLinearModel(lm,effectSize,N)
 % Simulate data based on a linear model .
 % 
 % lm = A linearMixedModel that specifies the base model for a
@@ -9,7 +9,7 @@ function out = simulateLinearModel(o,lm,effectSize,N)
 % N = How many observations to generate. Note that N=1 means
 % one observation for each of the combinations (i.e. 6 for the
 % example).
-X = designMatrix(o,lm,bf.internal.getAllTerms(lm),'zeroSumConstraint',false,'treatAsRandom',{});
+X = bf.internal.designMatrix(lm,bf.internal.getAllTerms(lm),'zeroSumConstraint',false,'treatAsRandom',{});
 X = [X{:}];
 if numel(effectSize)==1
     effectSize = effectSize*ones(1,size(X,2));

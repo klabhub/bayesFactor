@@ -133,7 +133,7 @@ switch upper(p.Results.test)
     case 'RMANOVA'
         %Repeated measures ANOVA
         dataFun = @(effectSize,N) bf.internal.simulateLinearModel(p.Results.linearModel,effectSize,N);
-        bfFun   = @(X,Y) bf.internal.anova(X,Y);
+        bfFun   = @(X,Y) bf.anova(X,Y);
     case 'SPECIAL'
         % User specified functions to generate simulated data
         % and calculate the bf
