@@ -20,7 +20,7 @@ function [results] = designAnalysis(varargin)
 %                   considered sufficient and the threshold above
 %                  which the evidence for H1 is considered sufficient. [1/6 6].
 % nrMC  =   The number of monte carlo simulations to run [10000]
-% test  = Which statistical test to use. TTEST, TTEST2,RMANOVA
+% test  = Which statistical test to use. TTEST, TTEST2,LINEARMIXEDMODEL
 % effectSize = The (expected) effectSize under H1. The "units" differ per test:
 %                   TTEST,TTEST2: expressed as fraction of the standard deviation. [0.5]
 %                   LINEARMIXEDMODEL: expected coefficients in
@@ -29,14 +29,14 @@ function [results] = designAnalysis(varargin)
 %                   To specify a distribution of effectSizes,
 %                   use an anonymouys function. For instance,
 %                   for an effect size with a mean of 0.5 and stdev of 0.1,
-%                   pass @(N) (0.5_0.1*randn([N 1]])
+%                   pass @(N) (0.5+0.1*randn([N 1]])
 %
 % tail = Tail for TTest/TTest2. [both]
-% scale = SCale of the Cauchy prior [sqrt(2)/2].
+% scale = Scale of the Cauchy prior [sqrt(2)/2].
 % pSuccess = The target probability of "success" (reaching the
 % evidence boundary). [0.9]
 % linearModel = The linear model to simulate. Only used
-% for ANOVA test
+% for LINEARMIXEDMODEL test
 % plot = Toggle to show graphical output as in Schoenbrodt &
 %                   Wagenmakers
 % options = Monte Carlo /Parralel execution options [bf.options]
@@ -106,9 +106,11 @@ p.addParameter('sequential',false); % Toggle to use a sequential design [false]
 p.addParameter('nrMC',10000); % Each N is evaluated this many time (Monte Carlo)
 p.addParameter('evidenceBoundary',[1/6 6]);
 p.addParameter('pSuccess',0.9); % For a fixed-N design, which fraction of success (i.e. reaching the h1 evidence boundary) is acceptable (used to calculate minimalN)
-p.addParameter('test','TTEST');  % Select one of TTEST, TTEST2, RMANOVA,ANOVA, SPECIAL
+p.addParameter('test','TTEST');  % Select one of TTEST, TTEST2,SPECIAL
 p.addParameter('effectSize',0.5);
 p.addParameter('linearModel',[]); % Used only for linearModel
+p.addParameter('alternativeModel',''); % Used only for linearModel
+p.addParameter('subject',''); % The subject variablename in the linearModel
 p.addParameter('tail','both');
 p.addParameter('scale',sqrt(2)/2);
 p.addParameter('plot',true);
@@ -118,10 +120,16 @@ p.addParameter('options',bf.options);
 p.parse(varargin{:});
 results.H1 = struct('N',struct('min',NaN,'median',NaN,'all',[],'pMax',NaN),'bf',struct('all',[],'median',nan),'pFalse',[]);
 results.H0 = results.H1;
+
+if ~isempty(p.Results.linearModel)
+    test = 'LINEARMODEL';
+else
+    test = p.Results.test;
+end
 % Depending on the test, create anonymous functions that will
 % generate simulated data aand call the appropriate BF function
 % in the MonteCarlo loop below.
-switch upper(p.Results.test)
+switch upper(test)
     case 'TTEST'
         % BFDA for a one-sample ttest.
         dataFun = @(effectSize,N) ({effectSize + randn([N 1])});
@@ -130,10 +138,10 @@ switch upper(p.Results.test)
         % Two sample ttest
         dataFun = @(effectSize,N) ({-0.5*effectSize + randn([N 1]),0.5*effectSize + randn([N 1])});
         bfFun = @(X,Y) bf.ttest2(X,Y,'tail',p.Results.tail,'scale',p.Results.scale);
-    case 'RMANOVA'
-        %Repeated measures ANOVA
-        dataFun = @(effectSize,N) bf.internal.simulateLinearModel(p.Results.linearModel,effectSize,N);
-        bfFun   = @(X,Y) bf.anova(X,Y);
+    case 'LINEARMODEL'
+        %Linear mixed model analysis (using bf.anova)
+        dataFun = @(effectSize,N) bf.internal.simulateLinearModel(p.Results.linearModel,effectSize,N,p.Results.subject);
+        bfFun   = @(X,Y) bf.anova(X,Y,'alternativeModel',p.Results.alternativeModel);
     case 'SPECIAL'
         % User specified functions to generate simulated data
         % and calculate the bf
@@ -151,11 +159,13 @@ results.H0.bf.all = nan(p.Results.nrMC,nrN);
 maxN = max(p.Results.N);
 upperBF = max(p.Results.evidenceBoundary);
 lowerBF = min(p.Results.evidenceBoundary);
+
 if isa(p.Results.effectSize,'function_handle')
     es = p.Results.effectSize(maxN);
 else
     es = p.Results.effectSize;
-end 
+end
+
 if p.Results.sequential
     % Run a sequential design :  generate fake data for maxN
     % subjects but sample htese successively and at each step
@@ -220,14 +230,14 @@ if p.Results.sequential
     results.H0.N.median = median(results.H0.N.all);
     results.H0.pFalse  = nrFalsePositive./p.Results.nrMC;
     results.H0.N.pMax = nrMax./p.Results.nrMC;
-   
+    
     results.H0.pTrue =  (p.Results.nrMC-nrMax-nrFalsePositive)/p.Results.nrMC;
     results.H1.pTrue =  (p.Results.nrMC-nrMax-nrFalseNegative)/p.Results.nrMC;
-
+    
 else
     % Simualte a regular fixed N design
     h1BfAll = nan(p.Results.nrMC,nrN);
-    h0BfAll = nan(p.Results.nrMC,nrN);            
+    h0BfAll = nan(p.Results.nrMC,nrN);
     parfor (j= 1:p.Results.nrMC,p.Results.options.nrWorkers)
         thisBf0 = nan(1,nrN);
         thisBf1 = nan(1,nrN);
@@ -238,7 +248,7 @@ else
             thisBf0(i)= bfFun(nullData{:}); % Collect BF under H0
         end
         h1BfAll(j,:) = thisBf1;
-        h0BfAll(j,:) = thisBf0;        
+        h0BfAll(j,:) = thisBf0;
     end
     results.H1.bf.all= h1BfAll; % Assign outside parfor
     results.H0.bf.all = h0BfAll;
@@ -260,16 +270,16 @@ else
     results.H0.pFalse =  nanmean(results.H0.bf.all>upperBF);  % Upper evidence boundary under H0 = false positives
     results.H1.pFalse =  nanmean(results.H1.bf.all<lowerBF);  % Lower evidence boundary under H1 - false negatives
     results.H0.bf.median  = median(results.H0.bf.all);
-    results.H1.bf.median = median(results.H1.bf.all);    
+    results.H1.bf.median = median(results.H1.bf.all);
     results.H0.pTrue =  nanmean(results.H0.bf.all<lowerBF);  % Lower evidence boundary under H0 = true positives
     results.H1.pTrue =  nanmean(results.H1.bf.all>upperBF);  % Upper evidence boundary under H1 - true positives
-
+    
 end
 
 
 
 % If requested show graphs
-if p.Results.plot    
+if p.Results.plot
     ticks= ([1/10 1/3 1  3 10 30 10.^(2:8)] );
     tickLabels = {'1/10','1/3', '1',' 3','10','30','100','1000','10^4','10^5','10^6','10^7','10^8'};
     clf;
@@ -302,7 +312,7 @@ if p.Results.plot
                 toPlot100 = toPlot(randsample(size(toPlot,1),100),:);
             else
                 toPlot100 = toPlot;
-            end                
+            end
             plot(p.Results.N,toPlot100','Color',0.5*ones(1,3))
             hold on
             plot([1 maxN],upperBF*ones(1,2),'k--')
@@ -311,7 +321,7 @@ if p.Results.plot
             set(gca,'YScale','Log','YLim',[lowerBF*0.7 upperBF*1.3],'YTick',ticks,'YTickLabels',tickLabels)
             xlabel 'Sample Size'
             ylabel 'Bayes Factor (BF_{10})'
-            title (['BFDA (' p.Results.test '): Under ' hyp ': Effect Size= ' es ' (nrMC = ' num2str(p.Results.nrMC) ')']);
+            title (['BFDA (' test '): Under ' hyp ': Effect Size= ' es ' (nrMC = ' num2str(p.Results.nrMC) ')']);
             h1Boundary  = mean(max(toPlot,[],2)>=upperBF);
             text(min(p.Results.N),1.1*upperBF,sprintf('%d%% stopped at H1 Boundary',round(100*h1Boundary)),'FontWeight','Bold');
             h0Boundary = mean(min(toPlot,[],2)<=lowerBF);
@@ -362,8 +372,8 @@ if p.Results.plot
         xlims = get(allAx,'XLim');
         xlims = cat(1,xlims{:});
         set(allAx,'XLim',[round(min(xlims(:,1))) round(max(xlims(:,2)))]);
-%         h = annotation(gcf,'textbox',[0.3 0.95 0.4 0.025],'String',...
-%             ['BFDA: ' p.Results.test ' (nrMC = ' num2str(p.Results.nrMC) ') Minimal N for ' num2str(p.Results.pSuccess*100) '% success = ' num2str(results.H1.N.min) ]);
+        %         h = annotation(gcf,'textbox',[0.3 0.95 0.4 0.025],'String',...
+        %             ['BFDA: ' test ' (nrMC = ' num2str(p.Results.nrMC) ') Minimal N for ' num2str(p.Results.pSuccess*100) '% success = ' num2str(results.H1.N.min) ]);
         h.HorizontalAlignment = 'Center';
         for i=allAx(:)'
             % Show evidence boundary

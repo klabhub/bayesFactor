@@ -30,7 +30,7 @@ X = cell(1,nrAllTerms);
 %vars are categorical quite well. But use categorical() in the data table
 %to be sure (or chars/strings).
 opts = {'model','linear','intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
-
+isCategorical = varfun(@(x) isa(x,'categorical') || iscellstr(x) || isstring(x) || ischar(x) || islogical(x), lm.Variables,'OutputFormat','uniform');
 for i=1:nrAllTerms
     if any(allTerms{i}==':')
         % An interaction term.
@@ -38,7 +38,7 @@ for i=1:nrAllTerms
         bName = extractAfter(allTerms{i},':');
         thisA = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',aName,opts{:});
         thisB = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',bName,opts{:});
-        if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint
+        if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint && isCategorical(i)
             thisA = bf.internal.zeroSumConstraint(thisA);
         end
         if ~ismember(bName,treatAsRandom) && p.Results.zeroSumConstraint
@@ -49,7 +49,7 @@ for i=1:nrAllTerms
         % A main term
         thisX = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},opts{:});
         % Sum-to-zero contrasts that equates marginal priors across levels.
-         if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint           
+         if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint && isCategorical(i)
             thisX = bf.internal.zeroSumConstraint(thisX);
         end
     end

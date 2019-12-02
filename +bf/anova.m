@@ -14,6 +14,20 @@ function [bf10,lm] = anova(x,y,varargin)
 %  y = A Wilkinson notation formula.
 %
 % Parm/Value pairs:
+% 'alternativeModel' - The model against which the BF is to be calculated.
+%                       By defaults this is the intercept-only model. For a
+%                       model with random effects it is the model with only
+%                       random effects. In other words, the BF quantifies
+%                       the evidence that the model with all the fixed
+%                       effects is better than a model with no fixed
+%                       effects. 
+%                       To test against a specific other model, a formula
+%                       can be specified here. 
+%                       For example if the main formula is rt~ori*freq, we
+%                       can determine the Bayes Factor for just the main
+%                       effect of orientation by specifying an alternative
+%                       model without just that main effect
+%                       ('rt~freq+ori:freq')
 % 'sharedPriors' - Which columns (i.e. factors) in the table should share a
 %                   their prior on their effect size. The default is that
 %                   all levels within a factor share a prior.
@@ -33,7 +47,8 @@ function [bf10,lm] = anova(x,y,varargin)
 % effects so the scale defaults to sqrt(2).
 %
 % OUTPUT
-% bf10 - The Bayes Factor comparing the model to the model with intercept only.
+% bf10 - The Bayes Factor comparing the model to the model with intercept
+%       only or with teh model specified in 'alternativeModel'.
 %       To compute BF for more refined hypotheses you compute
 %       a BF for the full model, and a restricted model and
 %       then take the ratio. See rouderFigures for examples.
@@ -64,6 +79,7 @@ p.addParameter('treatAsRandom',{});
 p.addParameter('options',bf.options);
 p.addParameter('scale',sqrt(2)/2,@isnumeric); 
 p.addParameter('randomEffectsScale',sqrt(2),@isnumeric); % Wide scale by default for RE.
+p.addParameter('alternativeModel','',@ischar);
 p.parse(args{:});
 
 
@@ -140,15 +156,21 @@ fullSharedPriorIx = bf.internal.sharedPriorIx(X,fullTerms,fullSharedPriors);
 X= [X{:}];
 bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',fullSharedPriorIx,'options',p.Results.options,'scale',fullScale);
 
-%% Correct for RE if any
-if nrReTerms >0
-    % If Random Effects were specified, fit a model with only the Random Effects
+if ~isempty(p.Results.alternativeModel) 
+    out= find(strcmpi(args(1:2:end),'AlternativeModel'));
+    args([out out+1])=[];
+    % Fit the alternative mdoel with same args
+    bf10Alternative= bf.anova(lm.Variables,p.Results.alternativeModel,args{:});
+elseif nrReTerms >0    
+    %% It there are RE, the alternative model has only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
-    bf10RE = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
-    % This is the BF for the model with only the random factors vs. the
-    % model with just an intercept. To get the BF for the fied effects we
-    % divide this out.
-    bf10 = bf10/bf10RE;
+    bf10Alternative = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
+else
+    bf10Alternative =1;
+end
+% To get the BF for the model versus the alternative we
+% divide this out.
+bf10 = bf10/bf10Alternative;
 end
 
 
