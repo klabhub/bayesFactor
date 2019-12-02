@@ -20,12 +20,9 @@ function [results] = designAnalysis(varargin)
 %                   considered sufficient and the threshold above
 %                  which the evidence for H1 is considered sufficient. [1/6 6].
 % nrMC  =   The number of monte carlo simulations to run [10000]
-% test  = Which statistical test to use. TTEST, TTEST2,LINEARMIXEDMODEL
+% test  = Which statistical test to use. TTEST, TTEST2,
 % effectSize = The (expected) effectSize under H1. The "units" differ per test:
 %                   TTEST,TTEST2: expressed as fraction of the standard deviation. [0.5]
-%                   LINEARMIXEDMODEL: expected coefficients in
-%                   the linear model in the order corresponding
-%                   to the design matrix.
 %                   To specify a distribution of effectSizes,
 %                   use an anonymouys function. For instance,
 %                   for an effect size with a mean of 0.5 and stdev of 0.1,
@@ -35,11 +32,18 @@ function [results] = designAnalysis(varargin)
 % scale = Scale of the Cauchy prior [sqrt(2)/2].
 % pSuccess = The target probability of "success" (reaching the
 % evidence boundary). [0.9]
-% linearModel = The linear model to simulate. Only used
-% for LINEARMIXEDMODEL test
 % plot = Toggle to show graphical output as in Schoenbrodt &
 %                   Wagenmakers
 % options = Monte Carlo /Parralel execution options [bf.options]
+%
+% Using Linear Mixed Models
+% linearModel = The linear model to simulate. 
+% alternativeModel = A Wilcoxon formula describing the alternative model to
+% test against. [Defaults to the intercept only model See bf.anova)]
+% subject = The variable in the model that identifies unique subjects. (see
+% bf.internal.simulateLinearModel)
+% In a linear model simulation, effectSize is the scaling factor of the
+% standard deviation of the residuals in the simulated data.
 %
 % To add your own analysis, but reuse the looping/graphing from
 % this funcition, set 'test' to 'SPECIAL' and provide
@@ -52,7 +56,7 @@ function [results] = designAnalysis(varargin)
 % For a tutorial on BFDA, see
 %           Schoenbrodt, F. D. & Wagenmakers, E. J.
 %           Bayes factor design analysis: Planning for compelling evidence.
-%           Psychon. Bull. Rev. 1–15 (2017). doi:10.3758/s13423-017-1230-y
+%           Psychon. Bull. Rev. 1?15 (2017). doi:10.3758/s13423-017-1230-y
 %
 % OUTPUT
 % A struct contining structs H1 and H0. They contain information on the simulations

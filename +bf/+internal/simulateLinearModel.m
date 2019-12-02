@@ -24,7 +24,7 @@ function out = simulateLinearModel(lm,effectSize,N,subject)
 % the model (no noise).
 tbl =lm.Variables;
 errorStd = std(lm.residuals);
-if ~isempty(subject)
+if nargin >3 && ~isempty(subject)
     uSubjects = unique(tbl.(subject));
     if iscell(uSubjects)
         % Char specified 
@@ -33,8 +33,9 @@ if ~isempty(subject)
         % Num specified
         stay = tbl.(subject)==uSubjects(1);
     end
+    tbl = tbl(stay,:);    
 end
-tbl = tbl(stay,:);
+
 
 if effectSize==0
     y = zeros(height(tbl),1);
