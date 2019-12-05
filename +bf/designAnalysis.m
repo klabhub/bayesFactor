@@ -33,11 +33,12 @@ function [results] = designAnalysis(varargin)
 % pSuccess = The target probability of "success" (reaching the
 % evidence boundary). [0.9]
 % plot = Toggle to show graphical output as in Schoenbrodt &
-%                   Wagenmakers
+%                   Wagenmakers. Pass the results struct of a previous run in this argument
+%                   to generate only the plot.
 % options = Monte Carlo /Parralel execution options [bf.options]
 %
 % Using Linear Mixed Models
-% linearModel = The linear model to simulate. 
+% linearModel = The linear model to simulate.
 % alternativeModel = A Wilcoxon formula describing the alternative model to
 % test against. [Defaults to the intercept only model See bf.anova)]
 % subject = The variable in the model that identifies unique subjects. (see
@@ -50,8 +51,13 @@ function [results] = designAnalysis(varargin)
 % 'dataFun', functions that generate data
 % based on an effect size and N, and 'bfFun', a function that
 % cacluates the bayesFactor based on the output of the dataFun.
-% Check the code for TTEST etc. below for examples of
-% dataFun/bfFun.
+% In code the following lines will be executed with the functions you
+% provide
+%  data  = dataFun(effectSize,N);
+%  thisBf  =  bfFun(data{:});
+%
+% For sequential designs, there are some additional hurdles for dataFun ouput (see
+% LinearMixedModel in the code below).
 %
 % For a tutorial on BFDA, see
 %           Schoenbrodt, F. D. & Wagenmakers, E. J.
@@ -92,15 +98,13 @@ function [results] = designAnalysis(varargin)
 %  Explore the power of a one sample T test with 20 or 100 subjects:
 %   This will create a figure like Figure #3 in Schoenbrodt &
 %   Wagenmakers.
-%       o = bayesFactor; % Create a bf object
-%       designAnalysis(o,'N',[20 100],'test','ttest','sequential',false);
+%       bf.designAnalysis('N',[20 100],'test','ttest','sequential',false);
 %
 % Investigate a sequential sampling design where we obtain
 % up to 200 samples but stop data collection if a BF10 of 1/6
 % or 6 is reached. (The example illustrates that sample size
 % spacing does not have to be regular
-%    o = bayesFactor;
-%    designAnalysis(o,'N',[20:2:60 65:5:120 130:10:200],'evidenceBoundary',[1/6 6],'test','ttest','sequential',true,'nrMC',1000);
+%    bf.designAnalysis('N',[20:2:60 65:5:120 130:10:200],'evidenceBoundary',[1/6 6],'test','ttest','sequential',true,'nrMC',1000);
 %
 % BK - Jan 2019
 
@@ -114,7 +118,6 @@ p.addParameter('test','TTEST');  % Select one of TTEST, TTEST2,SPECIAL
 p.addParameter('effectSize',0.5);
 p.addParameter('linearModel',[]); % Used only for linearModel
 p.addParameter('alternativeModel',''); % Used only for linearModel
-p.addParameter('subject',''); % The subject variablename in the linearModel
 p.addParameter('tail','both');
 p.addParameter('scale',sqrt(2)/2);
 p.addParameter('plot',true);
@@ -144,7 +147,7 @@ switch upper(test)
         bfFun = @(X,Y) bf.ttest2(X,Y,'tail',p.Results.tail,'scale',p.Results.scale);
     case 'LINEARMODEL'
         %Linear mixed model analysis (using bf.anova)
-        dataFun = @(effectSize,N) bf.internal.simulateLinearModel(p.Results.linearModel,effectSize,N,p.Results.subject);
+        dataFun = @(effectSize,N) bf.internal.simulateLinearModel(p.Results.linearModel,effectSize,N);
         bfFun   = @(X,Y) bf.anova(X,Y,'alternativeModel',p.Results.alternativeModel);
     case 'SPECIAL'
         % User specified functions to generate simulated data
@@ -170,120 +173,136 @@ else
     es = p.Results.effectSize;
 end
 
-if p.Results.sequential
-    % Run a sequential design :  generate fake data for maxN
-    % subjects but sample htese successively and at each step
-    % test whether the BF is above threshold (and if so,
-    % terminate). Repeat this nrMC times.
-    nrFalsePositive = 0;
-    nrFalseNegative = 0;
-    h1BfAll = nan(p.Results.nrMC,nrN);
-    h0BfAll = nan(p.Results.nrMC,nrN);
-    parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)
-        for hyp=0:1
-            thisBf = nan(1,nrN);
-            if hyp==0
-                % H0
-                data = dataFun(0,maxN);
-            else
-                % H1
-                data  = dataFun(es,maxN);
-            end
-            for i=1:nrN
-                % Sequential sampling for H1 data
-                thisData = cellfun(@(x)(x(1:N(i))),data,'UniformOutput',false); %#ok<PFBNS>
-                thisBf(i) = bfFun(thisData{:});
-                if thisBf(i) > upperBF || thisBf(i) < lowerBF
-                    % Crossed threshold. Stop sampling.
-                    if thisBf(i) <lowerBF
-                        if hyp==0
-                            nrFalsePositive= nrFalsePositive+1;
-                        else
-                            nrFalseNegative= nrFalseNegative+1;
-                        end
+%% Do the actual computation
+if isstruct(p.Results.plot)
+    showGraph = true;
+    % Plot a previously computed results struct
+    results =p.Results.plot;
+else
+    showGraph = p.Results.plot;
+    if p.Results.sequential
+        % Run a sequential design :  generate fake data for maxN
+        % subjects but sample htese successively and at each step
+        % test whether the BF is above threshold (and if so,
+        % terminate). Repeat this nrMC times.
+        nrFalsePositive = 0;
+        nrFalseNegative = 0;
+        h1BfAll = nan(p.Results.nrMC,nrN);
+        h0BfAll = nan(p.Results.nrMC,nrN);
+        parfor (j=1:p.Results.nrMC,p.Results.options.nrWorkers)
+        %for j=1:p.Results.nrMC
+            for hyp=0:1
+                thisBf = nan(1,nrN);
+                if hyp==0
+                    % H0
+                    data = dataFun(0,maxN);
+                else
+                    % H1
+                    data  = dataFun(es,maxN);
+                end
+                for i=1:nrN
+                    % Sequential sampling for H1 data
+                    if strcmpi(test,'LinearModel')
+                        %data{1} is the table. , data{2} the formula.
+                        perN = height(data{1})/maxN; % For N=1, pick perN from the table.
+                        thisData = {data{1}(1:perN*N(i),:),data{2}};
+                    else
+                        thisData = cellfun(@(x)(x(1:N(i))),data,'UniformOutput',false);
                     end
-                    break;
+                    thisBf(i) = bfFun(thisData{:});
+                    if thisBf(i) > upperBF || thisBf(i) < lowerBF
+                        % Crossed threshold. Stop sampling.
+                        if thisBf(i) <lowerBF && hyp==1
+                            nrFalseNegative= nrFalseNegative+1;
+                        else  % thisBf>upperBf
+                            if hyp==0
+                                nrFalsePositive= nrFalsePositive+1;                            
+                            end
+                        end
+                        break;
+                    end
+                end
+                if hyp==0
+                    h0BfAll(j,:) = thisBf;
+                else
+                    h1BfAll(j,:) = thisBf;
                 end
             end
-            if hyp==0
-                h0BfAll(j,:) = thisBf;
-            else
-                h1BfAll(j,:) = thisBf;
+        end
+        results.H1.bf.all= h1BfAll; % Assign outside parfor
+        results.H0.bf.all = h0BfAll;
+        
+        % Analyze the results to determine how many samples will
+        % be collected
+        [ix,col] = find(isnan(results.H1.bf.all)');
+        [~,isFirst] =unique(col);
+        nrSamplesEarlyStop  = p.Results.N(ix(isFirst));
+        nrMax = p.Results.nrMC- numel(isFirst);
+        results.H1.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
+        results.H1.N.median = median(results.H1.N.all);
+        results.H1.pFalse  = nrFalseNegative./p.Results.nrMC;
+        results.H1.N.pMax = nrMax./p.Results.nrMC;
+        
+        [ix,col] = find(isnan(results.H0.bf.all)');
+        [~,isFirst] =unique(col);
+        nrSamplesEarlyStop  = p.Results.N(ix(isFirst));
+        nrMax = p.Results.nrMC- numel(isFirst);
+        results.H0.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
+        results.H0.N.median = median(results.H0.N.all);
+        results.H0.pFalse  = nrFalsePositive./p.Results.nrMC;
+        results.H0.N.pMax = nrMax./p.Results.nrMC;
+        
+        results.H0.pTrue =  (p.Results.nrMC-nrMax-nrFalsePositive)/p.Results.nrMC;
+        results.H1.pTrue =  (p.Results.nrMC-nrMax-nrFalseNegative)/p.Results.nrMC;
+        
+    else
+        % Simualte a regular fixed N design
+        h1BfAll = nan(p.Results.nrMC,nrN);
+        h0BfAll = nan(p.Results.nrMC,nrN);
+        parfor (j= 1:p.Results.nrMC,p.Results.options.nrWorkers)
+            thisBf0 = nan(1,nrN);
+            thisBf1 = nan(1,nrN);
+            for i =1:nrN
+                data  = dataFun(es,N(i));
+                thisBf1(i) =  bfFun(data{:}); % Collect BF under H1
+                nullData  = dataFun(0,N(i));
+                thisBf0(i)= bfFun(nullData{:}); % Collect BF under H0
             end
+            h1BfAll(j,:) = thisBf1;
+            h0BfAll(j,:) = thisBf0;
         end
-    end
-    results.H1.bf.all= h1BfAll; % Assign outside parfor
-    results.H0.bf.all = h0BfAll;
-    
-    % Analyze the results to determine how many samples will
-    % be collected
-    [ix,col] = find(isnan(results.H1.bf.all)');
-    [~,isFirst] =unique(col);
-    nrSamplesEarlyStop  = p.Results.N(ix(isFirst));
-    nrMax = p.Results.nrMC- numel(isFirst);
-    results.H1.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
-    results.H1.N.median = median(results.H1.N.all);
-    results.H1.pFalse  = nrFalseNegative./p.Results.nrMC;
-    results.H1.N.pMax = nrMax./p.Results.nrMC;
-    
-    [ix,col] = find(isnan(results.H0.bf.all)');
-    [~,isFirst] =unique(col);
-    nrSamplesEarlyStop  = p.Results.N(ix(isFirst));
-    nrMax = p.Results.nrMC- numel(isFirst);
-    results.H0.N.all = [nrSamplesEarlyStop maxN*ones(1,nrMax)];
-    results.H0.N.median = median(results.H0.N.all);
-    results.H0.pFalse  = nrFalsePositive./p.Results.nrMC;
-    results.H0.N.pMax = nrMax./p.Results.nrMC;
-    
-    results.H0.pTrue =  (p.Results.nrMC-nrMax-nrFalsePositive)/p.Results.nrMC;
-    results.H1.pTrue =  (p.Results.nrMC-nrMax-nrFalseNegative)/p.Results.nrMC;
-    
-else
-    % Simualte a regular fixed N design
-    h1BfAll = nan(p.Results.nrMC,nrN);
-    h0BfAll = nan(p.Results.nrMC,nrN);
-    parfor (j= 1:p.Results.nrMC,p.Results.options.nrWorkers)
-        thisBf0 = nan(1,nrN);
-        thisBf1 = nan(1,nrN);
-        for i =1:nrN
-            data  = dataFun(es,N(i));
-            thisBf1(i) =  bfFun(data{:}); % Collect BF under H1
-            nullData  = dataFun(0,N(i));
-            thisBf0(i)= bfFun(nullData{:}); % Collect BF under H0
+        results.H1.bf.all= h1BfAll; % Assign outside parfor
+        results.H0.bf.all = h0BfAll;
+        % Calculate the minimum number of samples needed to reach
+        % H1 evidence boundary in p.Restuls.fractionSuccess of the
+        % experiments
+        ix  = mean(results.H1.bf.all>upperBF)>p.Results.pSuccess; %
+        if any(ix)
+            results.H1.N.min = Inf;
+        else
+            results.H1.N.min = min(p.Results.N(ix));
         end
-        h1BfAll(j,:) = thisBf1;
-        h0BfAll(j,:) = thisBf0;
+        ix  = mean(results.H0.bf.all<lowerBF)>p.Results.pSuccess; %
+        if any(ix)
+            results.H0.N.min = Inf;
+        else
+            results.H0.N.min = min(p.Results.N(ix));
+        end
+        results.H0.pFalse =  nanmean(results.H0.bf.all>upperBF);  % Upper evidence boundary under H0 = false positives
+        results.H1.pFalse =  nanmean(results.H1.bf.all<lowerBF);  % Lower evidence boundary under H1 - false negatives
+        results.H0.bf.median  = median(results.H0.bf.all);
+        results.H1.bf.median = median(results.H1.bf.all);
+        results.H0.pTrue =  nanmean(results.H0.bf.all<lowerBF);  % Lower evidence boundary under H0 = true positives
+        results.H1.pTrue =  nanmean(results.H1.bf.all>upperBF);  % Upper evidence boundary under H1 - true positives
+        
     end
-    results.H1.bf.all= h1BfAll; % Assign outside parfor
-    results.H0.bf.all = h0BfAll;
-    % Calculate the minimum number of samples needed to reach
-    % H1 evidence boundary in p.Restuls.fractionSuccess of the
-    % experiments
-    ix  = mean(results.H1.bf.all>upperBF)>p.Results.pSuccess; %
-    if any(ix)
-        results.H1.N.min = Inf;
-    else
-        results.H1.N.min = min(p.Results.N(ix));
-    end
-    ix  = mean(results.H0.bf.all<lowerBF)>p.Results.pSuccess; %
-    if any(ix)
-        results.H0.N.min = Inf;
-    else
-        results.H0.N.min = min(p.Results.N(ix));
-    end
-    results.H0.pFalse =  nanmean(results.H0.bf.all>upperBF);  % Upper evidence boundary under H0 = false positives
-    results.H1.pFalse =  nanmean(results.H1.bf.all<lowerBF);  % Lower evidence boundary under H1 - false negatives
-    results.H0.bf.median  = median(results.H0.bf.all);
-    results.H1.bf.median = median(results.H1.bf.all);
-    results.H0.pTrue =  nanmean(results.H0.bf.all<lowerBF);  % Lower evidence boundary under H0 = true positives
-    results.H1.pTrue =  nanmean(results.H1.bf.all>upperBF);  % Upper evidence boundary under H1 - true positives
-    
+    results.parms = p.Results; % Store input parser results
 end
 
 
-
 % If requested show graphs
-if p.Results.plot
+if showGraph
+    
     ticks= ([1/10 1/3 1  3 10 30 10.^(2:8)] );
     tickLabels = {'1/10','1/3', '1',' 3','10','30','100','1000','10^4','10^5','10^6','10^7','10^8'};
     clf;

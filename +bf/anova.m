@@ -1,4 +1,4 @@
-function [bf10,lm] = anova(x,y,varargin)
+function [bf10,lm,lmAlternative] = anova(x,y,varargin)
 % Function to analyze an N-way ANOVA with fixed and/or random effects
 % Currently this function can handle all fixed effects and random intercept
 % effects to model repeated measurements. Slope random effects have not 
@@ -160,13 +160,15 @@ if ~isempty(p.Results.alternativeModel)
     out= find(strcmpi(args(1:2:end),'AlternativeModel'));
     args([out out+1])=[];
     % Fit the alternative mdoel with same args
-    bf10Alternative= bf.anova(lm.Variables,p.Results.alternativeModel,args{:});
+    [bf10Alternative,lmAlternative]= bf.anova(lm.Variables,p.Results.alternativeModel,args{:});
 elseif nrReTerms >0    
     %% It there are RE, the alternative model has only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
     bf10Alternative = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
+    lmAlternative = [];
 else
     bf10Alternative =1;
+    lmAlternative = [];
 end
 % To get the BF for the model versus the alternative we
 % divide this out.

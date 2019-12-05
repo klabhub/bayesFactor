@@ -1,4 +1,4 @@
-function out = simulateLinearModel(lm,effectSize,N,subject)
+function out = simulateLinearModel(lm,effectSize,N)
 % Simulate data based on a linear model .
 % 
 % lm = A linearMixedModel that specifies the base model. This function will
@@ -10,11 +10,11 @@ function out = simulateLinearModel(lm,effectSize,N,subject)
 % 
 % N = How many observations to generate. Note that N=1 means
 % one observation for each of the combinations of all fixed effects.
-% subject = The name of the variable in the model that indicates the
-% 'subject'. This is used to select a complete subset of data for a single 
-% measurement. In other words,for N=1, the output table will have all the
-% data collected for 1 subject. So, for a 3x2 design with 10 subjects you'd
-% get 6 rows with N=1. Leaving subject empty would generate a 60 row output table. 
+% Random effects are ignored in the simulation.
+% So if lm analyzed a design with 2 groups of subjects, with 4 measuremetns
+% each then N=1 would create a table with 8 entries; the minimal complete
+% set to do an analysis. N=10 would create a table with 80 entries, all with
+% the same mean effect, but noise according to the estimates of the LM.
 %
 % OUTPUT
 % out {1} =table with simulated data.
@@ -22,21 +22,11 @@ function out = simulateLinearModel(lm,effectSize,N,subject)
 
 % Create a complete data table for a single subject who behaves exactly as
 % the model (no noise).
-tbl =lm.Variables;
+
 errorStd = std(lm.residuals);
-if nargin >3 && ~isempty(subject)
-    uSubjects = unique(tbl.(subject));
-    if iscell(uSubjects)
-        % Char specified 
-        stay = strcmpi(tbl.(subject),uSubjects{1});
-    else
-        % Num specified
-        stay = tbl.(subject)==uSubjects(1);
-    end
-    tbl = tbl(stay,:);    
-end
-
-
+% Gett one full set of all combinations of predictor values. 
+% Probably not ok for continuous vars, only for categories...
+tbl = unique(lm.Variables(:,lm.PredictorNames));
 if effectSize==0
     y = zeros(height(tbl),1);
 else
@@ -46,6 +36,7 @@ end
 tbl.(lm.ResponseName) = y;
 tbl = repmat(tbl,[N 1]); % Replicate N times.
 % Now add noise as esimated by the model
+%res =lm.residuals;
 tbl.(lm.ResponseName) = tbl.(lm.ResponseName) + errorStd*randn([height(tbl) 1]);
 out = {tbl,char(lm.Formula)};
 end
