@@ -7,6 +7,10 @@
 % This toolbox provides easy-to-use functions to replace (or complement) 
 % standard tools for experimental design (e.g. power analysis)  and hypothesis 
 % testing (e.g. ttest, anova).
+%% Download & Installation
+% Clone or fork the repository from here  https://github.com/klabhub/bayesFactor
+% then run installBayesFactor.m
+%
 %% Authors & Sources
 % The code was written by Bart Krekelberg (bart@vision.rutgers.edu) with some 
 % code taken from Sam Schwarzkopf's code and with inspiration from the R package 
