@@ -17,7 +17,7 @@ nrEffects = size(X,2);
 p =inputParser;
 p.addParameter('sharedPriors',{},@iscell); % Which effects share a prior? A cell array with indices corresponding to columns of X
 p.addParameter('options',bf.options);
-p.addParameter('scale',sqrt(2)/2,@isnumeric); 
+p.addParameter('scale',{sqrt(2)/2},@iscell); 
 p.addParameter('almostZero',0.00001,@isnumeric); % Integrating from zero can cause problems. Start at something not quite zero. (This is effect size so this is 0 for practical purposes)
 p.parse(varargin{:});
 
@@ -29,10 +29,12 @@ end
 
 nrDims = numel(sharedPriors);
 scale =p.Results.scale;
-if numel(scale)==1
-    % Single scale applies to all.
-elseif numel(scale) ~=nrDims
-    error('The number of scale elements (%d) does not match the number shared priors (%d)',numel(scale),nrDims);
+% Chcek that the scale matches in each of the dimensions
+for i=1:nrDims
+    scalesThisDim = numel(scale{i});
+    if scalesThisDim>1 && scalesThisDim ~=numel(sharedPriors{i}) 
+        error('The number of scale elements (%d) does not match the number shared priors (%d)',numel(scale),nrDims);
+    end
 end
 prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,scale));
 integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),2));

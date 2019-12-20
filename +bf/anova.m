@@ -101,57 +101,75 @@ for grp = 1:numel(f.GroupingVariableNames)
         %Intercept only random effect,
         thisTerms = strjoin(f.GroupingVariableNames{grp},':');
         reLm = fitlme(lm.Variables,[f.ResponseName '~ -1 + ' thisTerms]);
-        [thisReX] = bf.internal.designMatrix(reLm,{thisTerms},'treatAsRandom',f.GroupingVariableNames{grp},'zeroSumConstraint',false);        
+        [thisReX,~,isCategorical] = bf.internal.designMatrix(reLm,{thisTerms},'treatAsRandom',f.GroupingVariableNames{grp},'zeroSumConstraint',false);        
     else
         error('Slope random effects have not been implemented yet');
+    end
+    if ~all(isCategorical)
+        warning('Treating random effects grouping vars as categorical');
     end
     reX = cat(2,reX,thisReX);
     reTerms = cat(2,reTerms,{thisTerms});
     reSharedPriors = cat(2,reSharedPriors,{thisTerms});    
 end
+nrRePriors = numel(reSharedPriors);
 nrReTerms = numel(reTerms);
 if isscalar(p.Results.randomEffectsScale)
-   reScale= repmat(p.Results.randomEffectsScale,[1 nrReTerms]);
+   reScale= cell(1,nrRePriors);
+   [reScale{:}]= deal(p.Results.randomEffectsScale);% separate effects, but same scale 
 else
-    reScale = p.Results.randomEffectsScale;
-    assert(numel(reScale)==nrReTerms,'The number of randomEffectScales (%d) should match the number of random effects (%d) (or be a scalar)',numel(reScale),nrReTerms);
+    reScale = num2cell(p.Results.randomEffectsScale); % One scale for each effect
+    assert(numel(reScale)==nrRePriors,'The number of randomEffectScales (%d) should match the number of random effects grouping variables (%d) (or be a scalar)',numel(reScale),nrRePriors);
 end
 %% Fixed effects
 feTerms = bf.internal.getAllTerms(lm);
 % Construct the design matrix
-[feX,y] = bf.internal.designMatrix(lm,feTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
-nrFeTerms = numel(feTerms);
-% Setup sharing of priors as requested
+[feX,y,contScaleFactor] = bf.internal.designMatrix(lm,feTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
+% Handle the categorical variables first.
+isCategorical = isnan(contScaleFactor);
+catFeX      = feX(isCategorical);
+catFeTerms  = feTerms(isCategorical);
+nrCatFeTerms = size(catFeX,2);
+% Setup sharing of priors as requested for categorical variables, all
+% continuous variables share one Zellner-Siow prior
 if ischar(p.Results.sharedPriors)
     switch upper(p.Results.sharedPriors)
         case 'WITHIN'
             % Share priors for each level of each factor, but not across factors
-            feSharedPriors = cell(1,nrFeTerms);
-            [feSharedPriors{:}] = deal(feTerms{:});
+            catFeSharedPriors = cell(1,nrCatFeTerms);
+            [catFeSharedPriors{:}] = deal(catFeTerms{:});
         case 'SINGLEG'
-            feSharedPriors = {feTerms};
+            catFeSharedPriors = {catFeTerms};
         case {'NONE',''}
-            feSharedPriors ={};
+            catFeSharedPriors ={};
     end
 else
-    feSharedPriors = p.Results.sharedPriors;
+    catFeSharedPriors = p.Results.sharedPriors;
 end
-
+nrCatFeSharedPriors = numel(catFeSharedPriors);
 if isscalar(p.Results.scale)
-   feScale= repmat(p.Results.scale,[1 nrFeTerms]);
+   catFeScale= cell(1,nrCatFeSharedPriors);
+   [catFeScale{:}] =deal(p.Results.scale);
 else
-    feScale = p.Results.scale;
-    assert(numel(feScale)==nrFeTerms,'The number of scales (%d) should match the number of fixed effects (%d) (or be a scalar)',numel(feScale),nrFeTerms);
+    catFeScale = num2cell(p.Results.scale);
+    assert(numel(catFeScale)==nrCatFeSharedPriors,'The number of scales (%d) should match the number of fixed effects (%d) (or be a scalar)',numel(catFeScale),nrCatFeSharedPriors);
 end
 
+  
 
-
-%% Now combine FE and RE to get the BF for the full model.
-X = cat(2,feX,reX);
-fullSharedPriors= cat(2,feSharedPriors,reSharedPriors);
-fullTerms = cat(2,feTerms,reTerms);
-fullScale = [feScale reScale];
+%% Now combine FE and RE .
+X = cat(2,catFeX,reX);
+fullSharedPriors= cat(2,catFeSharedPriors,reSharedPriors);
+fullTerms = cat(2,catFeTerms,reTerms);
+fullScale = cat(2,catFeScale,reScale);
 fullSharedPriorIx = bf.internal.sharedPriorIx(X,fullTerms,fullSharedPriors);
+%% Add the continuous fixed effects, which always share a single g, but with different scale factors
+if any(~isCategorical)
+    contIx = size(X,2)+(1:sum(~isCategorical));     
+    X = cat(2,X,feX{~isCategorical});
+    fullScale = cat(2,fullScale,{contScaleFactor(~isCategorical)});
+    fullSharedPriorIx = cat(2,fullSharedPriorIx, {contIx}); 
+end
 %% Call the nWayAnova function for the actual analysis
 X= [X{:}];
 bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',fullSharedPriorIx,'options',p.Results.options,'scale',fullScale);

@@ -13,6 +13,9 @@ if nargin <3
 end
 
 nrX = size(x,1);
+if iscell(scale)
+    scale = [scale{:}];
+end
 nrScale = numel(scale);
 if isvector(scale) && nrScale>1
     scale = scale(:)'; %Force Row
