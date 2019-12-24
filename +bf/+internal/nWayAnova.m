@@ -36,8 +36,9 @@ for i=1:nrDims
         error('The number of scale elements (%d) does not match the number shared priors (%d)',numel(scale),nrDims);
     end
 end
-prior = @(g)(bf.internal.scaledInverseChiPdf(g,1,scale));
-integrand = @(varargin) (bf.internal.rouderS(cat(1,varargin{:}),y,X,sharedPriors,p.Results.options).*prod(prior(cat(1,varargin{:})),2));
+
+% prior = @(g)();
+% integrand = @(varargin) (.*prod(prior(cat(1,varargin{:})),2));
 
 if nrDims>= p.Results.options.nDimsForMC
     % Use MC Sampling to calculate the integral
@@ -45,11 +46,28 @@ if nrDims>= p.Results.options.nDimsForMC
 else
     switch (nrDims)
         case 1
-            bf10 = integral(integrand,p.Results.almostZero,Inf);
+            bf10 = integral(@integrand,p.Results.almostZero,Inf);
         case 2
-            bf10 = integral2(integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
+            bf10 = integral2(@integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
         case 3
-            bf10 = integral3(integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
+            bf10 = integral3(@integrand,p.Results.almostZero,Inf,p.Results.almostZero,Inf,p.Results.almostZero,Inf);
     end
 end
+
+function value = integrand(varargin)
+
+    g =cat(1,varargin{:});
+    if isrow(g)
+        dim =1;
+    else
+        dim =2;
+    end
+    pG =bf.internal.scaledInverseChiPdf(g,1,scale);    
+    S = bf.internal.rouderS(g,y,X,sharedPriors,p.Results.options);
+    
+    value = S.*prod(pG,dim);
+    
 end
+
+end
+

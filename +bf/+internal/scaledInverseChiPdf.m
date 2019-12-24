@@ -12,19 +12,27 @@ if nargin <3
     scale =1; % Default to scaled inverse Chi-squared.
 end
 
-nrX = size(x,1);
+[nrX,dimX] = max(size(x));
 if iscell(scale)
-    scale = [scale{:}];
+    scale = [scale{:}];    
+    if dimX==1
+        scale = reshape(scale,1,[]);        
+    else
+        scale = reshape(scale,[],1);
+    end
 end
 nrScale = numel(scale);
-if isvector(scale) && nrScale>1
-    scale = scale(:)'; %Force Row
-    scale =repmat(scale,[nrX 1 ]);
+
+if nrScale >1
+    if dimX==1
+        x = repmat(x,[1 nrScale]);
+        scale = repmat(scale,[nrX 1]);
+    else
+        x = repmat(x,[nrScale 1]);
+        scale = repmat(scale,[1 nrX]);
+    end
 end
-if isvector(x) && nrScale >1
-    x = x(:); %Force col
-    x = repmat(x,[1 nrScale]);
-end
+
 z = x<0;
 x(z) =NaN;
 
