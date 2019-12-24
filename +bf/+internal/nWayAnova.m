@@ -37,13 +37,14 @@ for i=1:nrDims
     end
 end
 
-% prior = @(g)();
-% integrand = @(varargin) (.*prod(prior(cat(1,varargin{:})),2));
+prior = @(g) bf.internal.scaledInverseChiPdf(g,1,scale);
 
 if nrDims>= p.Results.options.nDimsForMC
-    % Use MC Sampling to calculate the integral
-    bf10 = bf.internal.mcIntegral(integrand,prior,nrDims,p.Results.options);
+    % Use MC Sampling to calculate the integral   
+    thisRouderS = @(g)(bf.internal.rouderS(g,y,X,sharedPriors,p.Results.options));
+    bf10 = bf.internal.mcIntegral(thisRouderS,prior,p.Results.options);
 else
+    % Use numeric integration 
     switch (nrDims)
         case 1
             bf10 = integral(@integrand,p.Results.almostZero,Inf);
@@ -54,20 +55,13 @@ else
     end
 end
 
-function value = integrand(varargin)
-
-    g =cat(1,varargin{:});
-    if isrow(g)
-        dim =1;
-    else
-        dim =2;
+    function value = integrand(varargin)
+        % Nested function, used by the quadrature integration
+        g =cat(1,varargin{:});  % Should be [nrEffects nrValues]  (integratal over dim 2)
+        pdfG = prior(g);    
+        S = bf.internal.rouderS(g,y,X,sharedPriors,p.Results.options);    
+        value = S.*prod(pdfG,1);    
     end
-    pG =bf.internal.scaledInverseChiPdf(g,1,scale);    
-    S = bf.internal.rouderS(g,y,X,sharedPriors,p.Results.options);
-    
-    value = S.*prod(pG,dim);
-    
-end
 
 end
 

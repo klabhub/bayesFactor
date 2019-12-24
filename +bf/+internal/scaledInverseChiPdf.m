@@ -13,6 +13,8 @@ if nargin <3
 end
 
 [nrX,dimX] = max(size(x));
+nrScalesInX = min(size(x));
+
 if iscell(scale)
     scale = [scale{:}];    
     if dimX==1
@@ -23,7 +25,7 @@ if iscell(scale)
 end
 nrScale = numel(scale);
 
-if nrScale >1
+if nrScale >nrScalesInX
     if dimX==1
         x = repmat(x,[1 nrScale]);
         scale = repmat(scale,[nrX 1]);
