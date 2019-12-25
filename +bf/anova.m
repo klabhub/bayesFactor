@@ -53,7 +53,7 @@ function [bf10,lm,lmAlternative] = anova(x,y,varargin)
 % effects. Random effects are typically expected to be larger than fixed
 % effects so the scale defaults to sqrt(2).
 % 'continuousScale' The scale of the distribution of the prior effects for
-% continuous covariates. Defaults to sqrt(2)/2 for consistency with the
+% continuous covariates. Defaults to 1 for consistency with the
 % Liang et al formula used  in bf.bfFromR2.
 %
 % Note on Scales: 
@@ -95,7 +95,7 @@ p.addParameter('treatAsRandom',{});
 p.addParameter('options',bf.options);
 p.addParameter('scale',sqrt(2)/2,@isnumeric); 
 p.addParameter('randomEffectsScale',sqrt(2),@isnumeric); % Wide scale by default for RE.
-p.addParameter('continuousScale',sqrt(2)/4,@(x) (isscalar(x) && isnumeric(x))); % Default for continuous
+p.addParameter('continuousScale',1,@(x) (isscalar(x) && isnumeric(x))); % Default for continuous
 p.addParameter('alternativeModel','',@(x) (ischar(x) || iscell(x)));
 p.parse(args{:});
 

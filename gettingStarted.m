@@ -7,9 +7,8 @@
 % This toolbox provides easy-to-use functions to replace (or complement) 
 % standard tools for experimental design (e.g. power analysis)  and hypothesis 
 % testing (e.g. ttest, anova).
-%% Download & Installation
-% Clone or fork the repository from here  https://github.com/klabhub/bayesFactor
-% then run installBayesFactor.m
+%% Download 
+% Clone or fork the repository from <https://github.com/klabhub/bayesFactor>
 %
 %% Authors & Sources
 % The code was written by Bart Krekelberg (bart@vision.rutgers.edu) with some 
@@ -35,7 +34,8 @@
 % 
 % * One sample t-test  (|bf.ttest|)
 % * Two sample t-test (|bf.ttest2|)
-% * N-Way Anova with fixed and random effects  (|bf.anova|)
+% * N-Way Anova with fixed and random effects, including continuous co-variates  (|bf.anova|)
+% * Regression (|bf.bfFromR2|)
 % * Pearson Correlation  (|bf.corr|)
 % * Binomial Test  (|bf.binom|)
 % 

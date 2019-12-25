@@ -36,17 +36,22 @@ X = cell(1,nrAllTerms);
 %Options for modelutils.designmatrix . Its internal alg determines which
 %vars are categorical quite well. But use categorical() in the data table
 %to be sure (or chars/strings).
-cateoricalOpts = {'model','linear','intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
-isCategoricalColumn  = @(x) (isa(x,'categorical') || iscellstr(x) || isstring(x) || ischar(x) || islogical(x));
-isCategoricalName = @(x) isCategoricalColumn(lm.Variables.(x));
+isCategorical = bf.internal.isCategorical(lm.Variables);
+if p.Results.forceCategorical
+    isCategorical = true(size(isCategorical));
+end
+cateoricalOpts = {'model','linear','intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName,'CategoricalVars',isCategorical};
 isContinuous = false(1,nrAllTerms);
+
 for i=1:nrAllTerms
     if any(allTerms{i}==':')
         % An interaction term.
         aName =extractBefore(allTerms{i},':');
         bName = extractAfter(allTerms{i},':');
-        bothCategorical = isCategoricalName(aName)  && isCategoricalName(bName);
-        bothContinuous = ~isCategoricalName(aName) && ~isCategoricalName(bName);
+        aCategorical  = bf.internal.isCategorical(lm.Variables,aName);
+        bCategorical = bf.internal.isCategorical(lm.Variables,bName);  
+        bothCategorical = aCategorical &&  bCategorical;
+        bothContinuous = ~aCategorical && ~bCategorical;
         if bothCategorical  || p.Results.forceCategorical
             thisA = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',aName,cateoricalOpts{:});
             if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint 
@@ -67,7 +72,7 @@ for i=1:nrAllTerms
         end        
     else
         % A main term
-        if isCategoricalName(allTerms{i}) || p.Results.forceCategorical        
+        if  bf.internal.isCategorical(lm.Variables,allTerms{i}) || p.Results.forceCategorical        
             thisX = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},cateoricalOpts{:});
             % Sum-to-zero contrasts that equates marginal priors across levels.
             if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint 
