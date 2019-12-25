@@ -1,29 +1,32 @@
-function [X,y,contScaleFactor] = designMatrix(lm,allTerms,varargin)
+function [X,y,isContinuous] = designMatrix(lm,allTerms,varargin)
 % Extract a design matix from a linear model.
-%  Dummy coded designs for categorical variables and zero-sum designs for
+%  Dummy coded designs for categorical variables and zero-sum covariates for
 %  contiunuous variables are returned as X
 % INPUT
 % lm =  A linear mixed efffects model
-% allTerms = A cell array of variable names to include int he
-% design arrrag ( e.g. {'ori','freq','ori:freq'} for two mains and an interaction)
+% allTerms = A cell array of variable names to include in the
+% design matrix ( e.g. {'ori','freq','ori:freq'} for two mains and an interaction)
 % Parm/Value
 % ZeroSumConstraint -  Toggle to apply the zero sum constraint to
-%                   each factor (This equates the marginal prior across terms in the
+%                   each categorical factor (This equates the marginal prior across terms in the
 %                           factor; see Rouder et al) [true]
 % treatAsRandom  - A char or a cell array of chars with factors that should be
 %               treated as random (i.e. not fixed) effects.
 %               [{}].
+% forceCategorical - Logical to force each term to be treated as a
+% categorical variable (useful for grouping variables like subject ID which
+% may look continuous...)
 % OUTPUT
-% X = The design matrix for categorical variables. Cell array with one element per term.
+% X = The complete design matrix. Cell array with one element per term.
 % y = The response data
-% contScaleFactor = Zellner-Siow Prior Scale Factors for continuous
-% variables, NaN for Categorical vars
+% isContinuous = Logical indicating which columns are continuous co-variates.
 %
 % BK - 2019.
 
 p = inputParser;
 p.addParameter('zeroSumConstraint',true,@islogical);
 p.addParameter('treatAsRandom',{},@(x) ischar(x) || iscell(x));
+p.addParameter('forceCategorical',false,@islogical);
 p.parse(varargin{:});
 treatAsRandom =p.Results.treatAsRandom;
 if ischar(treatAsRandom);treatAsRandom = {treatAsRandom};end
@@ -36,7 +39,7 @@ X = cell(1,nrAllTerms);
 cateoricalOpts = {'model','linear','intercept',false,'DummyVarCoding','full','responseVar',lm.ResponseName};
 isCategoricalColumn  = @(x) (isa(x,'categorical') || iscellstr(x) || isstring(x) || ischar(x) || islogical(x));
 isCategoricalName = @(x) isCategoricalColumn(lm.Variables.(x));
-contScaleFactor = nan(1,nrAllTerms);
+isContinuous = false(1,nrAllTerms);
 for i=1:nrAllTerms
     if any(allTerms{i}==':')
         % An interaction term.
@@ -44,7 +47,7 @@ for i=1:nrAllTerms
         bName = extractAfter(allTerms{i},':');
         bothCategorical = isCategoricalName(aName)  && isCategoricalName(bName);
         bothContinuous = ~isCategoricalName(aName) && ~isCategoricalName(bName);
-        if bothCategorical 
+        if bothCategorical  || p.Results.forceCategorical
             thisA = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',aName,cateoricalOpts{:});
             if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint 
                 thisA = bf.internal.zeroSumConstraint(thisA);
@@ -54,19 +57,17 @@ for i=1:nrAllTerms
                 thisB = bf.internal.zeroSumConstraint(thisB);
             end
             thisX = bf.internal.interaction(thisA,thisB);    
-
         elseif bothContinuous
             thisX =  classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',{aName,bName},'intercept',false,'model','interactions','responseVar',lm.ResponseName);
             N=size(thisX,1);
-            thisX = thisX-sum(thisX)/N; % Sum =0;Rouder et al page 269.             
-            thisScale = inv(thiX'*thisX/N);
-            contScaleFactor(i) =thisScale(1,2); % Interaction term is the 1,2 element of the 2x2 matrix 
+            thisX = thisX-sum(thisX)/N; % Sum =0;Rouder et al page 269.                        
+            isContinuous(i) = true;
         else
             error('An interaction betwen categorical and continuous variables has not been implemented yet');            
         end        
     else
         % A main term
-        if isCategoricalName(allTerms{i})
+        if isCategoricalName(allTerms{i}) || p.Results.forceCategorical        
             thisX = classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},cateoricalOpts{:});
             % Sum-to-zero contrasts that equates marginal priors across levels.
             if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint 
@@ -76,7 +77,7 @@ for i=1:nrAllTerms
              thisX =  classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},'intercept',false,'model','linear','responseVar',lm.ResponseName);
              N=size(thisX,1);
              thisX = thisX-sum(thisX)/N; % Sum =0;Rouder et al page 269.
-             contScaleFactor(i) = inv(thisX'*thisX/N); % For a single main effect, this is a scalar.
+             isContinuous(i) = true;
         end
     end
     X{i} =thisX; % Store for later use

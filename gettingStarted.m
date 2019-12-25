@@ -163,7 +163,7 @@ anova(modelFull)
 % This shows that after including the intercept term for subjects, the
 % Bayes Factor is increased substantially (as are the F values in the ANOVA).
 %
-% Isolating a main effect while using hte repeated measures aspect of the design
+% Isolating a main effect while using the repeated measures aspect of the design
 % works analogously:
 
 bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');  

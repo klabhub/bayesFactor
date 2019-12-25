@@ -1,14 +1,14 @@
 %% Example with continuous covariates (i.e. regression)
 
 % Compare the Liang et al formula (bf.bfFromR2) with the explciit
-% integration implemented in the anova function (so that it can handle
+% integration implemented in the bf.anova function (so that it can handle
 % continuous covariates as well as mixtures of continuous and categorical
 % covariates).
 nrSamples = 50;
-nrRegressors =3;
-regressors = rand(nrSamples,nrRegressors);
-noiseLevel = 2.0;   
-nrIterations = 10;
+nrRegressors =2;
+regressors = repmat([.1 3],[nrSamples 1]).*rand(nrSamples,nrRegressors);
+noiseLevel = 1;   
+nrIterations = 100;
 bfLiang = nan(nrIterations,1);
 bfFull = nan(nrIterations,1);
 for i=1:nrIterations
@@ -20,10 +20,10 @@ for i=1:nrIterations
     bfLiang(i) = bf.bfFromR2(R2,nrSamples,nrRegressors);
     % Create a table to do integration in the anova function
     r = num2cell(regressors,1);
-    T = table(y,r{:},'VariableNames',{'y','x1','x2','x3'});
-    bfFull(i)=bf.anova(T,'y~x1+x2+x3');
+    T = table(y,r{:},'VariableNames',{'y','x1','x2'});
+    bfFull(i)=bf.anova(T,'y~x1+x2','continuousScale',sqrt(2)/2);
 end
-%%
+%
 figure(1);
 clf;
 subplot(1,2,1);
@@ -35,6 +35,14 @@ axis square;
 xlabel 'BF Integrated'
 ylabel 'BF Liang Formula'
 subplot(1,2,2);
-hist(log10(bfFull)-log10(bfLiang))
-xlabel 'Difference (log10)'
+hist(bfFull./bfLiang)
+xlabel 'BF Ratio (Anova/bfFromR2'
 ylabel '# Models'
+
+
+%% Attitude
+
+load attitude
+%lmm = fitlme(attitude,'rating~complaints+privileges+learning+raises+critical+advance')
+altModels = {'rating~complaints+learning','rating~complaints+learning+advance','rating~complaints+raises','rating~complaints+privileges','rating~complaints+advance'};
+bf.anova(attitude,'rating~complaints','alternativeModel',altModels,'continuousScale',sqrt(2)/4)

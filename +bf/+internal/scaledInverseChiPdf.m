@@ -12,27 +12,11 @@ if nargin <3
     scale =1; % Default to scaled inverse Chi-squared.
 end
 
-[nrX,dimX] = max(size(x));
-nrScalesInX = min(size(x));
-
-if iscell(scale)
-    scale = [scale{:}];    
-    if dimX==1
-        scale = reshape(scale,1,[]);        
-    else
-        scale = reshape(scale,[],1);
-    end
-end
-nrScale = numel(scale);
-
-if nrScale >nrScalesInX
-    if dimX==1
-        x = repmat(x,[1 nrScale]);
-        scale = repmat(scale,[nrX 1]);
-    else
-        x = repmat(x,[nrScale 1]);
-        scale = repmat(scale,[1 nrX]);
-    end
+[nrScalesInX,nrX] = size(x);
+[nrScales,mustBeOne] = size(scale);
+assert(mustBeOne==1 && (nrScales==1 || nrScales ==nrScalesInX),'The number of scales does not match');
+if nrScalesInX>1
+    scale = repmat(scale,[1 nrX]);    
 end
 
 z = x<0;

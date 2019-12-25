@@ -1,8 +1,14 @@
 function [bf10,lm,lmAlternative] = anova(x,y,varargin)
-% Function to analyze an N-way ANOVA with fixed and/or random effects
+% Function to analyze an N-way ANOVA with fixed categorical and/or random effects
+% as well as continuous covariates. 
+% 
 % Currently this function can handle all fixed effects and random intercept
 % effects to model repeated measurements. Slope random effects have not 
-% been implemented yet.
+% been implemented yet.  
+% 
+% For anova with only continous covariates (i.e. regression),
+% the bf.bfFromR2 function is a quicker option. Use this function when
+% mixing categorical and continuous covariates.
 %
 % INPUT
 %  The user can provide the data as output of fitlme (i.e. a linear
@@ -22,7 +28,7 @@ function [bf10,lm,lmAlternative] = anova(x,y,varargin)
 %                       effects is better than a model with no fixed
 %                       effects. 
 %                       To test against a specific other model, a formula
-%                       can be specified here. 
+%                       or a cell array of formulas can be specified here. 
 %                       For example if the main formula is rt~ori*freq, we
 %                       can determine the Bayes Factor for just the main
 %                       effect of orientation by specifying an alternative
@@ -40,11 +46,20 @@ function [bf10,lm,lmAlternative] = anova(x,y,varargin)
 %                       'within' - share within a fixed effect factor, not across
 %                       'singleG' - share across all fixed effects.
 % 'treatAsRandom' - Factors to be treated as random effects.
-% 'options' - Monte Carlo Integration options. Defaults to bf.options.m
+% 'options' - Monte Carlo Integration options. Defaults to bf.options
+% 
 % 'scale' - The scale of the distribution of the prior effects. [sqrt(2)/2)
 % 'randomEffectsScale' - The scale of the distribution of prior random
 % effects. Random effects are typically expected to be larger than fixed
 % effects so the scale defaults to sqrt(2).
+% 'continuousScale' The scale of the distribution of the prior effects for
+% continuous covariates. Defaults to sqrt(2)/2 for consistency with the
+% Liang et al formula used  in bf.bfFromR2.
+%
+% Note on Scales: 
+% Either a single scale should be specified, or one scale per group of covariates 
+% that share a prior.
+% 
 %
 % OUTPUT
 % bf10 - The Bayes Factor comparing the model to the model with intercept
@@ -53,7 +68,8 @@ function [bf10,lm,lmAlternative] = anova(x,y,varargin)
 %       a BF for the full model, and a restricted model and
 %       then take the ratio. See rouderFigures for examples.
 % lm  = The linear mixed model.
-%
+% lmAlternative = the linear mixed model for the alternative formula
+% 
 % See gettingStarted.m for examples.
 % 
 % BK -2018
@@ -79,7 +95,8 @@ p.addParameter('treatAsRandom',{});
 p.addParameter('options',bf.options);
 p.addParameter('scale',sqrt(2)/2,@isnumeric); 
 p.addParameter('randomEffectsScale',sqrt(2),@isnumeric); % Wide scale by default for RE.
-p.addParameter('alternativeModel','',@ischar);
+p.addParameter('continuousScale',sqrt(2)/4,@(x) (isscalar(x) && isnumeric(x))); % Default for continuous
+p.addParameter('alternativeModel','',@(x) (ischar(x) || iscell(x)));
 p.parse(args{:});
 
 
@@ -101,12 +118,9 @@ for grp = 1:numel(f.GroupingVariableNames)
         %Intercept only random effect,
         thisTerms = strjoin(f.GroupingVariableNames{grp},':');
         reLm = fitlme(lm.Variables,[f.ResponseName '~ -1 + ' thisTerms]);
-        [thisReX,~,isCategorical] = bf.internal.designMatrix(reLm,{thisTerms},'treatAsRandom',f.GroupingVariableNames{grp},'zeroSumConstraint',false);        
+        thisReX = bf.internal.designMatrix(reLm,{thisTerms},'forceCategorical',true,'treatAsRandom',f.GroupingVariableNames{grp},'zeroSumConstraint',false);        
     else
         error('Slope random effects have not been implemented yet');
-    end
-    if ~all(isCategorical)
-        warning('Treating random effects grouping vars as categorical');
     end
     reX = cat(2,reX,thisReX);
     reTerms = cat(2,reTerms,{thisTerms});
@@ -124,11 +138,10 @@ end
 %% Fixed effects
 feTerms = bf.internal.getAllTerms(lm);
 % Construct the design matrix
-[feX,y,contScaleFactor] = bf.internal.designMatrix(lm,feTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
+[feX,y,isContinuous] = bf.internal.designMatrix(lm,feTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
 % Handle the categorical variables first.
-isCategorical = isnan(contScaleFactor);
-catFeX      = feX(isCategorical);
-catFeTerms  = feTerms(isCategorical);
+catFeX      = feX(~isContinuous);
+catFeTerms  = feTerms(~isContinuous);
 nrCatFeTerms = size(catFeX,2);
 % Setup sharing of priors as requested for categorical variables, all
 % continuous variables share one Zellner-Siow prior
@@ -163,34 +176,51 @@ fullSharedPriors= cat(2,catFeSharedPriors,reSharedPriors);
 fullTerms = cat(2,catFeTerms,reTerms);
 fullScale = cat(2,catFeScale,reScale);
 fullSharedPriorIx = bf.internal.sharedPriorIx(X,fullTerms,fullSharedPriors);
-%% Add the continuous fixed effects, which always share a single g, but with different scale factors
-if any(~isCategorical)
-    contIx = size(X,2)+(1:sum(~isCategorical));     
-    X = cat(2,X,feX{~isCategorical});
-    fullScale = cat(2,fullScale,{contScaleFactor(~isCategorical)});
+
+
+%% Add the continuous effects
+% These always share a single g, but with a scale factor that is determined
+% by their (co)-variance
+if any(isContinuous)
+    contIx = size(X,2)+(1:sum(isContinuous));     
+    X = cat(2,X,feX(isContinuous));
+    fullScale = cat(2,fullScale,{p.Results.continuousScale});
     fullSharedPriorIx = cat(2,fullSharedPriorIx, {contIx}); 
+else
+    contIx =[];
 end
 %% Call the nWayAnova function for the actual analysis
 X= [X{:}];
-bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',fullSharedPriorIx,'options',p.Results.options,'scale',fullScale);
+bf10 = bf.internal.nWayAnova(y,X,'sharedPriors',fullSharedPriorIx,'options',p.Results.options,'scale',fullScale,'continuous',contIx);
 
 if ~isempty(p.Results.alternativeModel) 
+    % A specific alternative model formula was specified
+    if ischar(p.Results.alternativeModel)
+        alternativeModel = {p.Results.alternativeModel};
+    else
+       alternativeModel = p.Results.alternativeModel;
+    end
     out= find(strcmpi(args(1:2:end),'AlternativeModel'));
     args([out out+1])=[];
-    % Fit the alternative mdoel with same args
-    [bf10Alternative,lmAlternative]= bf.anova(lm.Variables,p.Results.alternativeModel,args{:});
+    nrAlternatives = numel(alternativeModel);
+    bf10Alternative = nan(nrAlternatives,1);    
+    lmAlternative =  cell(nrAlternatives,1);
+    for alt = 1:nrAlternatives 
+        % Fit the alternative mdoel with same args
+        [bf10Alternative(alt),lmAlternative{alt}]= bf.anova(lm.Variables,alternativeModel{alt},args{:});
+    end
 elseif nrReTerms >0    
     %% It there are RE, the alternative model has only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
     bf10Alternative = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
     lmAlternative = [];
-else
+else % No alternative model specified , compare to the Intercept only model
     bf10Alternative =1;
     lmAlternative = [];
 end
 % To get the BF for the model versus the alternative we
 % divide this out.
-bf10 = bf10/bf10Alternative;
+bf10 = bf10./bf10Alternative;
 end
 
 
