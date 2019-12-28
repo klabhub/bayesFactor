@@ -1,6 +1,6 @@
-function [bf10,lm,lmAlternative] = anova(tbl,formula,varargin)
-% Function to analyze an N-way ANOVA with fixed categorical and/or random effects
-% as well as
+function [bf10] = anova(tbl,formula,varargin)
+% [bf10] = anova(tbl,formula,varargin)
+% Analyze an N-way ANOVA with fixed categorical or continuous and random effects
 % 
 % Limitations: 
 %   only pairwise/two-way interactions; no higher orders.
@@ -63,8 +63,6 @@ function [bf10,lm,lmAlternative] = anova(tbl,formula,varargin)
 %       To compute BF for more refined hypotheses you compute
 %       a BF for the full model, and a restricted model and
 %       then take the ratio. See rouderFigures.m for examples.
-% lm  = The linear mixed model.
-% lmAlternative = the linear mixed model for the alternative formula
 %
 % See gettingStarted.m for examples.
 %
@@ -89,8 +87,6 @@ if iscell(formula)
     % with a recursive call to this function.
     nrFormulas= numel(formula);
     bf10 = nan(1,nrFormulas);
-    lm = cell(1,nrFormulas);
-    lmAlternative = cell(1,nrFormulas);
     for i=1:nrFormulas
         [bf10(i)] = bf.anova(tbl,formula{i});
     end
@@ -107,9 +103,8 @@ for i=1:numel(contPredictors)
 end
 
 %% Random effects
-% Extract the formula and create a dummy lmm for each of the grouping
-% variables so that we can use the same code (internal.designMatrix) to
-% extract the design matrix.
+% Extract the formula and use (bf.internal.designMatrix) to
+% extract the design matrix for each grouping variable
 % Priors are shared across all grouping variables in the same group
 % For instance, (1|subject:block) + (1|day)
 % will share priors for subject:block and, separately, for all levels of day
@@ -210,19 +205,16 @@ if ~isempty(p.Results.alternativeModel)
     args([out out+1])=[];
     nrAlternatives = numel(alternativeModel);
     bf10Alternative = nan(nrAlternatives,1);
-    lmAlternative =  cell(nrAlternatives,1);
     for alt = 1:nrAlternatives
         % Fit the alternative mdoel with same args
-        [bf10Alternative(alt),lmAlternative{alt}]= bf.anova(tbl,alternativeModel{alt},args{:});
+        bf10Alternative(alt)= bf.anova(tbl,alternativeModel{alt},args{:});
     end
 elseif nrReTerms >0
     %% It there are RE, the alternative model has only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
     bf10Alternative = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
-    lmAlternative = [];
 else % No alternative model specified , compare to the Intercept only model (which is included in the RouderS function as the comparison model)
     bf10Alternative =1;
-    lmAlternative = [];
 end
 % To get the BF for the model versus the alternative we
 % divide out the alternative bf.

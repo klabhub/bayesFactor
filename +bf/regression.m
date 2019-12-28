@@ -1,4 +1,5 @@
 function [bf10,lm] = regression(tbl,formula)
+% [bf10,lm] = regression(tbl,formula)
 % Given a table and a Wilcoxon formula, perform a regression and return 
 % the Bayes Factor for the full model versus the intercept only (null)
 % model.

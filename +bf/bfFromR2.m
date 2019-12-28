@@ -1,6 +1,7 @@
 function [bf10,bfApprox10] = bfFromR2(R2,nrSamples,nrRegressors)
-% Estimate the BayesFactor of a linear regression using the R-squared
-% coefficient of determination (R^2)of the regression, based on the formula derived by Liang et al.
+% Estimate the BayesFactor of a linear regression using R-squared
+% coefficient of determination (R^2)of the regression, based on the formula 
+% derived by Liang et al.
 % 
 % Liang, F., Paulo, R., Molina, G., Clyde, M. A., & Berger, J. O. (2008). 
 % Mixtures of g priors for Bayesian variable selection. 
