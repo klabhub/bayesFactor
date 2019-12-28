@@ -55,7 +55,7 @@ toothgrowth.dose = log2(toothgrowth.dose);
 tgCont = fitlm(toothgrowth,'len~supp*dose');
 anova(tgCont)
 % Now the corresponding Bayes Factors
-bfFullCat = bf.anova(tgCat) % Full categorical model agains intercept
+bfFullCat = bf.anova(toothgrowth,'len~supp*doseAsFactor') % Full categorical model agains intercept
 bfNoInteractionCat = bf.anova(toothgrowth,'len~supp+doseAsFactor'); % Without Interaciton 
 bfFullCat/bfNoInteractionCat  % Bayes Factor that quantifies the evidence in favor of an interaction.
 %
@@ -79,6 +79,7 @@ bfAnova = bf.anova(attitude,models,'continuousScale',1);
 for i=1:numel(models)
     fprintf('%s:\t\t%3.2f\n',models{i},bfAnova(i)./bfAnova(1)); % Compare ~complaints with other models.
 end
+%%
 % Alternatively (quicker), use the bf.regression function:
 [bfRegression,lm] = bf.regression(attitude,models);
 %The bfRegression and bfAnova calculations give the same result

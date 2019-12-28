@@ -1,13 +1,13 @@
 function [bf10,lm,lmAlternative] = anova(tbl,formula,varargin)
 % Function to analyze an N-way ANOVA with fixed categorical and/or random effects
-% as well as continuous covariates.
-%
-% Currently this function can handle all fixed effects and random intercept
-% effects to model repeated measurements. Slope random effects have not
-% been implemented yet.
+% as well as
+% 
+% Limitations: 
+%   only pairwise/two-way interactions; no higher orders.
+%   only random intercept effects;  no slope random effects. 
 %
 % For anova with only continous covariates (i.e. regression),
-% the bf.bfFromR2 function is a quicker option. Use this function when
+% the bf.bfFromR2 function is a quicker option. Use bf.anova when
 % mixing categorical and continuous covariates.
 %
 % INPUT
@@ -46,11 +46,11 @@ function [bf10,lm,lmAlternative] = anova(tbl,formula,varargin)
 %
 % 'scale' - The scale of the distribution of the prior effects. [sqrt(2)/2)
 % 'randomEffectsScale' - The scale of the distribution of prior random
-% effects. Random effects are typically expected to be larger than fixed
-% effects so the scale defaults to sqrt(2).
+%           effects. Random effects are typically expected to be larger than fixed
+%           effects so the scale defaults to sqrt(2).
 % 'continuousScale' The scale of the distribution of the prior effects for
-% continuous covariates. Defaults to 1 for consistency with the
-% Liang et al formula used  in bf.bfFromR2.
+%           continuous covariates. Defaults to 1 for consistency with the
+%           Liang et al formula used  in bf.bfFromR2.
 %
 % Note on Scales:
 % Either a single scale should be specified, or one scale per group of covariates
@@ -59,10 +59,10 @@ function [bf10,lm,lmAlternative] = anova(tbl,formula,varargin)
 %
 % OUTPUT
 % bf10 - The Bayes Factor comparing the model to the model with intercept
-%       only or with teh model specified in 'alternativeModel'.
+%       only or with the models) specified in 'alternativeModel'.
 %       To compute BF for more refined hypotheses you compute
 %       a BF for the full model, and a restricted model and
-%       then take the ratio. See rouderFigures for examples.
+%       then take the ratio. See rouderFigures.m for examples.
 % lm  = The linear mixed model.
 % lmAlternative = the linear mixed model for the alternative formula
 %
@@ -92,7 +92,7 @@ if iscell(formula)
     lm = cell(1,nrFormulas);
     lmAlternative = cell(1,nrFormulas);
     for i=1:nrFormulas
-        [bf10(i),lm{i},lmAlternative{i}] = bf.anova(tbl,formula{i});
+        [bf10(i)] = bf.anova(tbl,formula{i});
     end
     return;
 end
@@ -105,7 +105,6 @@ contPredictors =setxor(intersect(F.PredictorNames,tbl.Properties.VariableNames(~
 for i=1:numel(contPredictors)
     tbl.(contPredictors{i}) = tbl.(contPredictors{i})- mean(tbl.(contPredictors{i}));
 end
-lm = fitlme(tbl,formula);
 
 %% Random effects
 % Extract the formula and create a dummy lmm for each of the grouping
@@ -117,13 +116,12 @@ lm = fitlme(tbl,formula);
 reX = {};
 reSharedPriors = {};
 reTerms ={};
-for grp = 1:numel(lm.Formula.GroupingVariableNames)
-    thisREFormula = lm.Formula.RELinearFormula{grp};
+for grp = 1:numel(F.GroupingVariableNames)
+    thisREFormula = F.RELinearFormula{grp};
     if strcmpi(thisREFormula.LinearPredictor,'1')
         %Intercept only random effect,
-        thisTerms = strjoin(lm.Formula.GroupingVariableNames{grp},':');
-        reLm = fitlme(lm.Variables,[lm.Formula.ResponseName '~ -1 + ' thisTerms]);
-        thisReX = bf.internal.designMatrix(reLm,{thisTerms},'forceCategorical',true,'treatAsRandom',lm.Formula.GroupingVariableNames{grp},'zeroSumConstraint',false);
+        thisTerms = strjoin(F.GroupingVariableNames{grp},':');
+        thisReX = bf.internal.designMatrix(tbl,{thisTerms},F.ResponseName,'forceCategorical',true,'treatAsRandom',F.GroupingVariableNames{grp},'zeroSumConstraint',false);
     else
         error('Slope random effects have not been implemented yet');
     end
@@ -141,9 +139,9 @@ else
     assert(numel(reScale)==nrRePriors,'The number of randomEffectScales (%d) should match the number of random effects grouping variables (%d) (or be a scalar)',numel(reScale),nrRePriors);
 end
 %% Fixed effects
-feTerms = bf.internal.getAllTerms(lm);
+feTerms = F.FELinearFormula.TermNames(2:end)';
 % Construct the design matrix
-[feX,y,isContinuous] = bf.internal.designMatrix(lm,feTerms,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
+[feX,y,isContinuous] = bf.internal.designMatrix(tbl,feTerms,F.ResponseName,'zeroSumConstraint',true,'treatAsRandom',p.Results.treatAsRandom);
 % Handle the categorical variables first.
 categoricalX      = feX(~isContinuous);
 categoricalTerms  = feTerms(~isContinuous);
@@ -215,19 +213,19 @@ if ~isempty(p.Results.alternativeModel)
     lmAlternative =  cell(nrAlternatives,1);
     for alt = 1:nrAlternatives
         % Fit the alternative mdoel with same args
-        [bf10Alternative(alt),lmAlternative{alt}]= bf.anova(lm.Variables,alternativeModel{alt},args{:});
+        [bf10Alternative(alt),lmAlternative{alt}]= bf.anova(tbl,alternativeModel{alt},args{:});
     end
 elseif nrReTerms >0
     %% It there are RE, the alternative model has only the Random Effects
     reSharedPriorIx =  bf.internal.sharedPriorIx(reX,reTerms,reSharedPriors);
     bf10Alternative = bf.internal.nWayAnova(y,[reX{:}],'sharedPriors',reSharedPriorIx,'options',p.Results.options,'scale',reScale);
     lmAlternative = [];
-else % No alternative model specified , compare to the Intercept only model
+else % No alternative model specified , compare to the Intercept only model (which is included in the RouderS function as the comparison model)
     bf10Alternative =1;
     lmAlternative = [];
 end
 % To get the BF for the model versus the alternative we
-% divide this out.
+% divide out the alternative bf.
 bf10 = bf10./bf10Alternative;
 
 if p.Results.options.verbose
