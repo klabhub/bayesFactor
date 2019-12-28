@@ -97,7 +97,15 @@ if iscell(formula)
     return;
 end
 
-
+F = classreg.regr.LinearMixedFormula(formula);
+groupingVariableNames = F.GroupingVariableNames;
+%% Remove the mean from continuous variables
+isCategorical = bf.internal.isCategorical(tbl);
+contPredictors =setxor(intersect(F.PredictorNames,tbl.Properties.VariableNames(~isCategorical)),[groupingVariableNames{:}]);     
+for i=1:numel(contPredictors)
+    tbl.(contPredictors{i}) = tbl.(contPredictors{i})- mean(tbl.(contPredictors{i}));
+end
+lm = fitlme(tbl,formula);
 
 %% Random effects
 % Extract the formula and create a dummy lmm for each of the grouping
@@ -109,13 +117,13 @@ end
 reX = {};
 reSharedPriors = {};
 reTerms ={};
-for grp = 1:numel(f.GroupingVariableNames)
-    thisREFormula = f.RELinearFormula{grp};
+for grp = 1:numel(lm.Formula.GroupingVariableNames)
+    thisREFormula = lm.Formula.RELinearFormula{grp};
     if strcmpi(thisREFormula.LinearPredictor,'1')
         %Intercept only random effect,
-        thisTerms = strjoin(f.GroupingVariableNames{grp},':');
-        reLm = fitlme(lm.Variables,[f.ResponseName '~ -1 + ' thisTerms]);
-        thisReX = bf.internal.designMatrix(reLm,{thisTerms},'forceCategorical',true,'treatAsRandom',f.GroupingVariableNames{grp},'zeroSumConstraint',false);
+        thisTerms = strjoin(lm.Formula.GroupingVariableNames{grp},':');
+        reLm = fitlme(lm.Variables,[lm.Formula.ResponseName '~ -1 + ' thisTerms]);
+        thisReX = bf.internal.designMatrix(reLm,{thisTerms},'forceCategorical',true,'treatAsRandom',lm.Formula.GroupingVariableNames{grp},'zeroSumConstraint',false);
     else
         error('Slope random effects have not been implemented yet');
     end

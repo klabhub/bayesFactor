@@ -20,7 +20,7 @@ if iscell(formula)
     end
 else
 % Fit a standard linear model to get R2
-lm = fitlme(tbl,formula);
-% Then use the Liang et al formula to determine the Bayes Factor.
-bf10=bf.bfFromR2(lm.Rsquared.Ordinary,lm.NumObservations,lm.NumPredictors);
+lm = fitlm(tbl,formula);
+% Then use the Liang et al formula to determine the Bayes Factor. 
+bf10=bf.bfFromR2(lm.Rsquared.Ordinary,lm.NumObservations,lm.NumEstimatedCoefficients-1);
 end

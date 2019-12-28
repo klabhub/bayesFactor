@@ -64,8 +64,8 @@ for i=1:nrAllTerms
             end
             thisX = bf.internal.interaction(thisA,thisB); 
         elseif bothContinuous
-            thisX =  classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',{aName,bName},'intercept',false,'model','interactions','responseVar',lm.ResponseName);
-            thisX = thisX-sum(thisX)/N; % Sum =0;Rouder et al page 369.                        
+            thisX =  lm.Variables.(aName).*lm.Variables.(bName);
+            thisX = thisX - mean(thisX);
             isContinuous(i) = true;
         else
             % Interaction between a categorical and a continuous covariate
@@ -81,8 +81,8 @@ for i=1:nrAllTerms
             else
                 thisB = lm.Variables.(bName);
             end            
-            thisX =  thisA.*thisB;
-            thisX = thisX -sum(thisX)/N;            
+            thisX  =  thisA.*thisB;
+            thisX  = thisX-mean(thisX);
             isContinuous(i) = true;
         end        
     else
@@ -94,9 +94,7 @@ for i=1:nrAllTerms
                 thisX = bf.internal.zeroSumConstraint(thisX);
             end
         else %Continuous
-             thisX =  classreg.regr.modelutils.designmatrix(lm.Variables,'PredictorVars',allTerms{i},'intercept',false,'model','linear','responseVar',lm.ResponseName);
-             N=size(thisX,1);
-             thisX = thisX-sum(thisX)/N; % Sum =0;Rouder et al page 369.
+             thisX =  lm.Variables.(allTerms{i});
              isContinuous(i)= true;
         end
         

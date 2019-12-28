@@ -9,21 +9,21 @@ nrSamples = 50;
 % Create co-variates with different variance
 nrRegressors = 2;
 regressors = repmat([.1 3],[nrSamples 1]).*rand(nrSamples,nrRegressors);
+% Add an interaction term
+regressors = [regressors ,0.01*prod(regressors,2)];
 noiseLevel = 1;    
-nrIterations = 10; % Esimate N models
+nrIterations = 10; % Estimate N models with the same regressors, but different betas and noise.
 bfLiang = nan(nrIterations,1);
 bfFull = nan(nrIterations,1);
 for i=1:nrIterations
-    beta = randn(1,nrRegressors);
+    beta = randn(1,nrRegressors+1);
     y = regressors*beta'+noiseLevel*randn([nrSamples 1]);
-    [b,~,~,~,stats] = regress(y,[ones(nrSamples,1) regressors]);    
-    R2 =stats(1);
-    % Use the Liang et al formula directly
-    bfLiang(i) = bf.bfFromR2(R2,nrSamples,nrRegressors);
-    % Create a table to do integration in the bf.anova function
     r = num2cell(regressors,1);
-    T = table(y,r{:},'VariableNames',{'y','x1','x2'});
-    bfFull(i)=bf.anova(T,'y~x1+x2','continuousScale',1);
+    T = table(y,r{:},'VariableNames',{'y','x1','x2','int'});    
+    % Use the bf.regression function (which uses the Liang et al formula)
+    bfLiang(i) = bf.regression(T,'y~x1*x2');
+    % Use the more general bf.anova function
+    bfFull(i)=bf.anova(T,'y~x1*x2','continuousScale',1);
 end
 % Show the direct comparison. This should be a slope 1 line.
 figure(1);
@@ -86,7 +86,8 @@ pctError= mean(100*(bfRegression-bfAnova)./(bfRegression+bfAnova))
 
 
 %% Test interactions
-bfInt = bf.anova(attitude,'rating~complaints*learning','continuousScale',1);
+bfInt = bf.anova(attitude,'rating~complaints*raises','continuousScale',1)
+bfIntReg= bf.regression(attitude,'rating~complaints*raises')
 
 
 
