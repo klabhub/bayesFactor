@@ -20,6 +20,7 @@ opt.maxG = 10000;   % Largest g value to intergare
 opt.stepG = 0.05;   % Step size for the g integration.
 opt.nrSamples = 10000;  % How many g samples to draw for the MC integration
 opt.nDimsForMC = 1; % If there are this many dimensions, use MC integration
+opt.verbose = true; % Show messages
 % 1 and 2D integration work fine with standard
 % integral.m but 3d is slow and higher not
 % possible.

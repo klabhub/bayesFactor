@@ -16,7 +16,7 @@ if ~isempty(continuousIx)
     contX = X(:,continuousIx);
     contGMatrix = inv(contX'*contX/N);
 end
-% NOTE It would be nice to evaluate this on a GPU but hte builtin gpuArray
+% NOTE It would be nice to evaluate this on a GPU but the builtin gpuArray
 % cannot compute all, diag, det, etc, on the GPU using the gpuArray/arrayfun
 % Just putting all variables on the gpuArray (and not using arrayfun) 
 % actually slows things down as a lot of copying takes place...
