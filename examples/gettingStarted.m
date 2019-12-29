@@ -216,20 +216,25 @@ rouderFigure4(100); % Use 100 bootstrap sets .
 % 
 rouderFigure5;
 
-%% Bayes Factor Design Analysis - Figures from Schoenbrodt & Wagenmakers 
-% This paper provides a tutorial treatment of Bayes Factor Design Analysis.
-%  Please see |schoenbrodtFigures.m| for details.
+%% Bayes Factor Design Analysis
+% Figures from Schoenbrodt & Wagenmakers, a paperthat provides a tutorial 
+% treatment of Bayes Factor Design Analysis. See |schoenbrodtFigures.m| for details.
+% Note that proper distribution estimates would require a larger number of 
+% MonteCarlo simulations - here we just run 100 to illustrate the main point.
 
-% Figure 3 in S&W analyzes a Fixed-N design for a T-test.
-schoenbrodtFigures(3,1000); % 10000 Monte Carlo sims
+%% Figure 3 in S&W analyzes a Fixed-N design for a two-sample T-test with 
+% N=20 and N=100 and a standardized effect size  of 0.5.
+schoenbrodtFigures(3,1000); % 1000 Monte Carlo sims
 
 %%
 %
-% Figure 4 in S&@ analyzes a Bayes sequential sampling design.
-schoenbrodtFigures(4,1000); % 10000 Monte Carlo sims
+% Figure 4 in S&W analyzes a Bayes sequential sampling design.
+% and the use of a distribution of a-priori effect sizes (instead ot a single 
+% predicted effect size)
+schoenbrodtFigures(4,1000); % 1000 Monte Carlo sims
 
 %%
 % 
 % Figure 5 refines the Sequential design analysis
-
-schoenbrodtFigures(5,1000); % 10000 Monte Carlo sims
+% with asymmetric evidence boundaries and a largger minimal N reduces false positives
+schoenbrodtFigures(5,1000); % 1000 Monte Carlo sims
