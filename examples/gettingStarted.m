@@ -27,27 +27,29 @@
 % *  Schoenbrodt, F. D. & Wagenmakers, E. J. Bayes factor design analysis: Planning 
 % for compelling evidence. Psychon. Bull. Rev. 1?15 (2017). doi:10.3758/s13423-017-1230-y
 %% System Requirements 
-% This toolbox depends on the Mathworks <https://www.mathworks.com/products/statistics.html 
-% Statistics and Machine Learning Toolbox >
+% This toolbox depends on the Mathworks Statistics and Machine Learning Toolbox 
+% <https://www.mathworks.com/products/statistics.html> 
+% 
 %% Features
 % Currently the following statistical tests have been implemented
 % 
 % * One sample t-test  (|bf.ttest|)
 % * Two sample t-test (|bf.ttest2|)
 % * N-Way Anova with fixed and random effects, including continuous co-variates  (|bf.anova|)
-% * Regression (|bf.bfFromR2|)
+% * Regression (|bf.regression|)
 % * Pearson Correlation  (|bf.corr|)
 % * Binomial Test  (|bf.binom|)
+% * Experimental Design & Power Analysis (|bf.designAnalysis|)
 % 
-% The |bf.designAnalysis |function is used to analyze experimental design (e.g. 
-% "power analysis").
-% 
-%  Note how all user accessible functions in this toolbox are defined inside the 'bf'
+%  All user accessible functions in this toolbox are defined inside the 'bf'
 %  package. This avoids naming conflicts with the standard ttest, ttest2 , etc functions. 
-% 
-% Function inside bf.internal are not meant to be called
-%  directly.
-% 
+%  Function inside bf.internal are not meant to be called directly.
+%  
+%  +bf/  - The package, with all user accessible functions
+%  docs/ - Documentation
+%  examples/ - Example scripts
+%  tools/    - Tools for the maintenance of the package
+%
 %% Installation
 % 
 % Place all files and folders in their own folder (e.g. bayesFactor) and
@@ -58,7 +60,8 @@
 %% Examples
 % These examples build on the examples used in the Statistics and Machine Learning 
 % Toolbox for traditional (frequentist) hypothesis testing and shows how they 
-% can be complemented with Bayesian analysis. 
+% can be complemented with Bayesian analysis. The |examples| folder
+% contains additional scripts with examples.
 %
 
 %% Single sample T-Test
@@ -93,7 +96,8 @@ load rouder2012Data
 % Analyze full model (linear effects of frequency and  orientation plus 
 % their interaction) 
 
-[bfFull,modelFull] = bf.anova(data,'rt~ori*freq');
+modelFull = fitlme(data,'rt~ori*freq');
+bfFull = bf.anova(data,'rt~ori*freq');
 %% 
 % The |modelFull| is a LinearMixedModel from the Matlab Statistics toolbox. 
 % We use it to show the traditional ANOVA table
@@ -140,7 +144,8 @@ data{slowSubjects,'rt'} = data.rt(slowSubjects)+0.25;
 
 %%
 % Calculate the BF and LMM model again
-[bfFull,modelFull] = bf.anova(data,'rt~ori*freq');
+modelFull = fitlme(data,'rt~ori*freq');
+bfFull = bf.anova(data,'rt~ori*freq');
 bfFull
 anova(modelFull)
 
@@ -154,8 +159,8 @@ anova(modelFull)
 % idiosyncratic offset in the RT for each subject. In the Wilcoxon formula
 % this is written as (1|subject) : fit a constant term (1) for each level
 % of subject.
-
-[bfFull,modelFull] = bf.anova(data,'rt~ori*freq + (1|subject)');
+modelFull = fitlme(data,'rt~ori*freq + (1|subject)');
+bfFull = bf.anova(data,'rt~ori*freq + (1|subject)');
 bfFull
 anova(modelFull)
 
@@ -175,6 +180,21 @@ bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');
 
 bfMain = bfFull/bfRestricted
 
+%% Regression
+% We analyze the attitude data set  (See
+% <https://richarddmorey.github.io/BayesFactor/#glm>)
+load attitude
+% Compare the rating~complaints model with a set of alternatives. Here we
+% just evaluate all the models relative to the intercept only alternative
+% and then take the ratios. 
+models = {'rating~complaints','rating~complaints+learning','rating~complaints+learning+advance','rating~complaints+raises','rating~complaints+privileges','rating~complaints+advance'};
+bfAnova = bf.regression(attitude,models);
+%% Show the comparisons
+for i=1:numel(models)
+    fprintf('%s vs. %s - Bayes Factor :\t\t\t%3.3f\n',models{i},models{1},bfAnova(i)./bfAnova(1)); % Compare rating~complaints with other models.
+end
+
+
 %% Figures from Rouder et al. 2012
 % Much of the mathematical basis for this package is developed in the Rouder 
 % et al. paper. To test the package, I recreated some of the figures in their 
@@ -189,7 +209,7 @@ rouderFigure2;
 % Figure 4 shows Bayes Factor analysis for simulated data with different 
 % effect sizes.
 % 
-rouderFigure4(100); % Use 1000 bootstrap sets . 
+rouderFigure4(100); % Use 100 bootstrap sets . 
 
 %%
 % Figure 5 illustrates the influence of fixed and random effects
