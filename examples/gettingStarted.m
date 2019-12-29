@@ -189,7 +189,8 @@ load attitude
 % and then take the ratios. 
 models = {'rating~complaints','rating~complaints+learning','rating~complaints+learning+advance','rating~complaints+raises','rating~complaints+privileges','rating~complaints+advance'};
 bfAnova = bf.regression(attitude,models);
-%% Show the comparisons
+%
+% Show the comparisons
 for i=1:numel(models)
     fprintf('%s vs. %s - Bayes Factor :\t\t\t%3.3f\n',models{i},models{1},bfAnova(i)./bfAnova(1)); % Compare rating~complaints with other models.
 end
@@ -222,7 +223,8 @@ rouderFigure5;
 % Note that proper distribution estimates would require a larger number of 
 % MonteCarlo simulations - here we just run 100 to illustrate the main point.
 
-%% Figure 3 in S&W analyzes a Fixed-N design for a two-sample T-test with 
+%% 
+% Figure 3 in S&W analyzes a Fixed-N design for a two-sample T-test with 
 % N=20 and N=100 and a standardized effect size  of 0.5.
 schoenbrodtFigures(3,1000); % 1000 Monte Carlo sims
 
