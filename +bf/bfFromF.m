@@ -1,6 +1,7 @@
 function bf10 = bfFromF(F,df1,df2,n)
-% Estimate the Bayes Factor from an F value, using the BIC approximation 
-% of Falukenberry 2018.
+% Estimate the Bayes Factor from an F value, using the BIC approximation.
+%
+% BACKGROUND: Faulkenberry, Biometrical Letters, 2018. 
 %
 % INPUT
 % F - The F-value of the ANOVA

@@ -1,6 +1,8 @@
 function bf10 = bfFromT(T,df2)
 % Estimate the Bayes Factor from a T statistic associated with a 
-% two independent sample T-test, using the BIC approximation of Falukenberry 2018. 
+% two independent sample T-test, using the BIC approximation.
+% 
+% BACKGROUND: Faulkenberry, Biometrical Letters, 2018. 
 %
 % Note that this is provided for completeness only; the bf.ttest function
 % provides a better calculation of the Bayes factor (also based on T, df, and n)

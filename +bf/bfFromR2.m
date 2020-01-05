@@ -2,7 +2,8 @@ function [bf10,bfApprox10] = bfFromR2(R2,nrSamples,nrRegressors)
 % Estimate the BayesFactor of a linear regression using R-squared
 % coefficient of determination (R^2)of the regression, based on the formula 
 % derived by Liang et al.
-% 
+%
+% BACKGROUND:
 % Liang, F., Paulo, R., Molina, G., Clyde, M. A., & Berger, J. O. (2008). 
 % Mixtures of g priors for Bayesian variable selection. 
 % Journal of the American Statistical Association, 103(481), 410–423. 
@@ -26,7 +27,7 @@ bf10 = integral(liangFun,0,Inf);
 
 % Zellner & Siow also derive an approximation that does not require
 % integration. No longer particularly useful now that integration is cheap.
-% but for comparison
+% For comparison:
 if nargout >1
     a =sqrt(pi)*gamma((nrRegressors+1)/2);
     v2 = nrSamples-nrRegressors-1;

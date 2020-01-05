@@ -1,10 +1,10 @@
 function [bf10,pValue,CI,stats] = ttest(X,varargin)
-%TTEST One-sample and paired-sample t-test.
+%TTEST Bayes Factors for one-sample and paired t-tests.
 % function [bf10,p,CI,stats] = ttest(X,varargin)    - one sample
 % function [bf10,p,CI,stats] = ttest(X,M,varargin)   -one sample,non-zero mean
+% function [bf10,p,CI,stats] = ttest(X,Y,varargin)   -paired samples
 %
-% Calculates Bayes Factor for a one-sample or paired T-test.
-%
+% INPUT 
 % X = single sample observations  (a column vector)
 % Y = paired observations (column vector) or a scalar mean to compare the samples in X to.
 %       [Defaults to 0]
@@ -18,11 +18,13 @@ function [bf10,pValue,CI,stats] = ttest(X,varargin)
 %
 % OUTPUT
 % bf10 - The Bayes Factor for the hypothesis that the mean is different
-%           from zero
+%           from zero. Using JZS priors. 
 % p - p value of the frequentist hypothesis test
 % CI    - Confidence interval for the true mean of X
 % stats - Structure with .tstat, .df,
 %
+% Based on: Rouder et al. J. Math. Psych. 2012
+% 
 % BK - Nov 2018
 
 if isnumeric(X)
@@ -70,7 +72,7 @@ else
     CI = [NaN NaN];
 end
 
-% Use the formula from Rouder 2009
+% Use the formula from Rouder et al.
 % This is the formula in that paper, but it does not use the
 % scale
 % numerator = (1+T.^2/(N-1)).^(-N/2);
