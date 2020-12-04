@@ -24,9 +24,12 @@ else
     for i=1:numel(terms)
         match = cellfun(@any,cellfun(@(x)(strcmp(terms{i},x)),sharedPriors,'UniformOutput',false));
         if ~any(match)
-            error(['Shared priors not defined for ' terms{i}]);
+            error(['Shared priors not defined for ' ]);
         end
         nrInThisTerm  = size(X{i},2);
+        if nrInThisTerm==0
+             error('The %s term does not vary in the table. Check your data table.', terms{i});   
+        end
         ix{match} = cat(2,ix{match},soFar+(1:nrInThisTerm));
         soFar = soFar+nrInThisTerm;
     end

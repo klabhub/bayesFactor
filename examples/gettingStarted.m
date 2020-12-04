@@ -96,7 +96,7 @@ load rouder2012Data
 % Analyze full model (linear effects of frequency and  orientation plus 
 % their interaction) 
 
-modelFull = fitlme(data,'rt~ori*freq');
+modelFull = fitlme(data,'rt~ori*freq','DummyVarCoding','effects');
 bfFull = bf.anova(data,'rt~ori*freq');
 %% 
 % The |modelFull| is a LinearMixedModel from the Matlab Statistics toolbox. 
@@ -144,7 +144,7 @@ data{slowSubjects,'rt'} = data.rt(slowSubjects)+0.25;
 
 %%
 % Calculate the BF and LMM model again
-modelFull = fitlme(data,'rt~ori*freq');
+modelFull = fitlme(data,'rt~ori*freq','DummyVarCoding','Effects');
 bfFull = bf.anova(data,'rt~ori*freq');
 bfFull
 anova(modelFull)
@@ -159,7 +159,7 @@ anova(modelFull)
 % idiosyncratic offset in the RT for each subject. In the Wilcoxon formula
 % this is written as (1|subject) : fit a constant term (1) for each level
 % of subject.
-modelFull = fitlme(data,'rt~ori*freq + (1|subject)');
+modelFull = fitlme(data,'rt~ori*freq + (1|subject)','DummyVarCoding','Effects');
 bfFull = bf.anova(data,'rt~ori*freq + (1|subject)');
 bfFull
 anova(modelFull)
@@ -175,7 +175,7 @@ bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');
 
 %% 
 % The evidence for the main effect is the ratio of the Bayes Factors. 
-% the difference withbefore is that now both BF have been calculated with
+% the difference with before is that now both BF have been calculated with
 % the subject random intercept.
 
 bfMain = bfFull/bfRestricted

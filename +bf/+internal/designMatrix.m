@@ -33,7 +33,7 @@ if ischar(treatAsRandom);treatAsRandom = {treatAsRandom};end
 
 nrAllTerms =numel(allTerms);
 X = cell(1,nrAllTerms);
-N = height(tbl);
+%N = height(tbl);
 
 %Options for modelutils.designmatrix . Its internal alg determines which
 %vars are categorical quite well. But use categorical() in the data table
@@ -47,69 +47,75 @@ isContinuous = false(1,nrAllTerms);
 for i=1:nrAllTerms
     if any(allTerms{i}==':')
         % An interaction term.
-       % names = strsplit(allTerms{i},':')
-        aName =extractBefore(allTerms{i},':');
-        bName = extractAfter(allTerms{i},':');
-        aCategorical  = bf.internal.isCategorical(tbl,aName);
-        bCategorical = bf.internal.isCategorical(tbl,bName);  
-        bothCategorical = aCategorical &&  bCategorical;
-        bothContinuous = ~aCategorical && ~bCategorical;
-        if bothCategorical || p.Results.forceCategorical
-            thisA = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',aName,cateoricalOpts{:});
-            if ~ismember(aName,treatAsRandom) && p.Results.zeroSumConstraint 
-                thisA = bf.internal.zeroSumConstraint(thisA);
+        thisTerms =strsplit(allTerms{i},':');
+        thisNrTerms = numel(thisTerms);
+        thisDm = cell(1,thisNrTerms);
+        thisIsCategorical = cellfun(@(name) bf.internal.isCategorical(tbl,name),thisTerms);
+        
+        if all(thisIsCategorical)
+            % Interaction between categorical variables
+            for j=1:thisNrTerms
+                % Extract design matrices
+                thisDm{j} =  classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',thisTerms{j},cateoricalOpts{:});
+                if ~ismember(thisTerms{j},treatAsRandom) && p.Results.zeroSumConstraint
+                    % Categorical variable with a zero-sum constraint
+                    thisDm{j} = bf.internal.zeroSumConstraint(thisDm{j});
+                end
             end
-            thisB = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',bName,cateoricalOpts{:});
-            if ~ismember(bName,treatAsRandom) && p.Results.zeroSumConstraint
-                thisB = bf.internal.zeroSumConstraint(thisB);
-            end
-            thisX = bf.internal.interaction(thisA,thisB); 
-        elseif bothContinuous
-            thisX =  tbl.(aName).*tbl.(bName);
-            thisX = thisX - mean(thisX);
+            thisX = bf.internal.interaction(thisDm{:});
+        elseif all(~thisIsCategorical)
+            % Interaction between continuous variables - extract from table
+            thisX = prod(table2array(tbl.(thisTerms{:})),2);
+            thisX = thisX - mean(thisX); % Remove mean
             isContinuous(i) = true;
-        else
-            % Interaction between a categorical and a continuous covariate
-            if aCategorical
-                thisA = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',aName,'intercept',false,'model','linear','responseVar',tbl.(responseVar),'DummyVarCoding','full');
-                if ismember(bName,allTerms)
+        else % Mixture of categorical and continuous
+            isContinuous(i) = true;
+            % Prepare deisng matrix for the first term
+            if thisIsCategorical(1)
+                thisX = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',thisTerms{1},'intercept',false,'model','linear','responseVar',responseVar,'DummyVarCoding','full');
+                others = 2:thisNrTerms;
+                if any(ismember(thisTerms{others},allTerms))
                     % B is already included as a main effect, have to
                     % remove one level from A to avoid colinearity,
-                     thisA = bf.internal.zeroSumConstraint(thisA);
-%                    thisA = thisA(:,2:end); % Remove first category
+                    thisX = bf.internal.zeroSumConstraint(thisX);
                 end
             else
-                thisA = tbl.(aName);
+                thisX = tbl.(thisTerms{1});
             end
-            if bCategorical
-                thisB = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',bName,'intercept',false,'model','linear','responseVar',tbl.(responseVar),'DummyVarCoding','full');
-                if ismember(aName,allTerms)
-                    % A is already included as a main effect, have to
-                    % remove one level from B to avoid colinearity,
-                    thisB = bf.internal.zeroSumConstraint(thisB);
-                    %thisB = thisB(:,2:end); % Remove first category
+            % Then multiply with successive terms
+            for j=2:thisNrTerms
+                if thisIsCategorical(j)
+                    thisB = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',thisTerms{j},'intercept',false,'model','linear','responseVar',responseVar,'DummyVarCoding','full');
+                    others = setdiff(1:thisNrTerms,j);
+                    if any(ismember(thisTerms(others),allTerms))
+                        % A is already included as a main effect, have to
+                        % remove one level from B to avoid colinearity,
+                        thisB = bf.internal.zeroSumConstraint(thisB);
+                    end
+                else
+                    thisB = tbl.(thisTerms{j});
                 end
-            else
-                thisB = tbl.(bName);
-            end            
-            thisX  =  thisA.*thisB;
-            thisX  = thisX-mean(thisX);
-            isContinuous(i) = true;
-        end        
+                thisX  =  thisX.*thisB;
+            end
+            %Remove mean
+            thisX  = thisX-mean(thisX);           
+        end      
     else
         % A main term
-        if  bf.internal.isCategorical(tbl,allTerms{i}) || p.Results.forceCategorical        
+        if  bf.internal.isCategorical(tbl,allTerms{i}) || p.Results.forceCategorical
             thisX = classreg.regr.modelutils.designmatrix(tbl,'PredictorVars',allTerms{i},cateoricalOpts{:});
             % Sum-to-zero contrasts that equates marginal priors across levels.
-            if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint 
+            if ~ismember(allTerms{i},treatAsRandom) && p.Results.zeroSumConstraint
                 thisX = bf.internal.zeroSumConstraint(thisX);
             end
         else %Continuous
-             thisX =  tbl.(allTerms{i});
-             thisX  = thisX-mean(thisX);
+            thisX =  tbl.(allTerms{i});
+            thisX  = thisX-mean(thisX);
             isContinuous(i)= true;
-        end
-        
+        end        
+    end
+    if isempty(thisX)
+        error('The %s term does not vary in this table. Check your data table.', allTerms{i});
     end
     X{i} =thisX; % Store for later use
 end

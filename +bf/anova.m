@@ -80,8 +80,15 @@ p.addParameter('scale',sqrt(2)/2,@isnumeric);
 p.addParameter('randomEffectsScale',sqrt(2),@isnumeric); % Wide scale by default for RE.
 p.addParameter('continuousScale',1,@(x) (isscalar(x) && isnumeric(x))); % Default for continuous
 p.addParameter('alternativeModel','',@(x) (ischar(x) || iscell(x)));
+p.addParameter('verbose',[]);
 p.parse(tbl,formula,varargin{:});
 
+if isempty(p.Results.verbose)
+    verbose = p.Results.options.verbose;
+else
+    verbose = p.Results.verbose;
+end
+   
 if iscell(formula)
     % Convenience function to evaluate multiple formulas
     % with a recursive call to this function.
@@ -97,7 +104,7 @@ F = classreg.regr.LinearMixedFormula(formula);
 groupingVariableNames = F.GroupingVariableNames;
 %% Remove the mean from continuous variables
 isCategorical = bf.internal.isCategorical(tbl);
-contPredictors =setxor(intersect(F.PredictorNames,tbl.Properties.VariableNames(~isCategorical)),[groupingVariableNames{:}]);     
+contPredictors =setdiff(intersect(F.PredictorNames,tbl.Properties.VariableNames(~isCategorical)),[groupingVariableNames{:}]);     
 for i=1:numel(contPredictors)
     tbl.(contPredictors{i}) = tbl.(contPredictors{i})- mean(tbl.(contPredictors{i}));
 end
@@ -175,7 +182,6 @@ fullTerms = cat(2,categoricalTerms,reTerms);
 fullScale = cat(2,categoricalScale,reScale);
 fullSharedPriorIx = bf.internal.sharedPriorIx(X,fullTerms,fullSharedPriors);
 
-
 %% Add the continuous effects
 % These always share a single g, but with a scale factor that is determined
 % by their (co)-variance
@@ -201,13 +207,14 @@ if ~isempty(p.Results.alternativeModel)
     else
         alternativeModel = p.Results.alternativeModel;
     end
+    args =varargin;
     out= find(strcmpi(args(1:2:end),'AlternativeModel'));
     args([out out+1])=[];
     nrAlternatives = numel(alternativeModel);
     bf10Alternative = nan(nrAlternatives,1);
     for alt = 1:nrAlternatives
         % Fit the alternative mdoel with same args
-        bf10Alternative(alt)= bf.anova(tbl,alternativeModel{alt},args{:});
+        bf10Alternative(alt)= bf.anova(tbl,alternativeModel{alt},args{:},'verbose',false);
     end
 elseif nrReTerms >0
     %% It there are RE, the alternative model has only the Random Effects
@@ -220,7 +227,7 @@ end
 % divide out the alternative bf.
 bf10 = bf10./bf10Alternative;
 
-if p.Results.options.verbose
+if verbose
     fprintf('Bayes Factor analysis of a linear model\n');
     fprintf('%d categorical fixed effects: %s\n',nrCategoricalTerms,strjoin(categoricalTerms,' '))
     fprintf('%d random effects: %s\n',nrReTerms,strjoin(reTerms,' '))

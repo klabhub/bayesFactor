@@ -12,8 +12,8 @@ function [bf10,bfApprox10] = bfFromR2(R2,nrSamples,nrRegressors)
 % The function uses Gaussian quadraure
 % INPUT
 %  R2 - The R-squared of the linear regression.
-%  N -  The number of samples in the regression.
-%  p - The number of regressors, excluding the constant term
+%  nrSamples -  The number of samples in the regression.
+%  nrRegressors - The number of regressors, excluding the constant term
 % OUTPUT
 %  bf10 - Bayes factor comparing the model with non-zero slopes to the
 %  model in which all slopes are zero.
