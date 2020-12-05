@@ -3,12 +3,11 @@ function [bf10] = anova(tbl,formula,varargin)
 % Analyze an N-way ANOVA with fixed categorical or continuous and random effects
 % 
 % Limitations: 
-%   only pairwise/two-way interactions; no higher orders.
 %   only random intercept effects;  no slope random effects. 
 %
 % For anova with only continous covariates (i.e. regression),
-% the bf.bfFromR2 function is a quicker option. Use bf.anova when
-% mixing categorical and continuous covariates.
+% the bf.bfFromR2 function is a quicker option. Use bf.anova with 
+% categorical or mixed categorical and continuous covariates.
 %
 % INPUT
 %  tbl = A table
@@ -51,6 +50,8 @@ function [bf10] = anova(tbl,formula,varargin)
 % 'continuousScale' The scale of the distribution of the prior effects for
 %           continuous covariates. Defaults to 1 for consistency with the
 %           Liang et al formula used  in bf.bfFromR2.
+% 'include' : logical address or index to include only certain rows from the
+% data. The default [] means 'use all rows'
 %
 % Note on Scales:
 % Either a single scale should be specified, or one scale per group of covariates
@@ -69,6 +70,7 @@ function [bf10] = anova(tbl,formula,varargin)
 % BK -2018
 % Nov 2019 - Added intercept random effects for repeated measurements
 % designs.
+% Dec 2020 - Added n-way interactions.
 
 p=inputParser;
 p.addRequired('tbl',@istable);
@@ -81,6 +83,8 @@ p.addParameter('randomEffectsScale',sqrt(2),@isnumeric); % Wide scale by default
 p.addParameter('continuousScale',1,@(x) (isscalar(x) && isnumeric(x))); % Default for continuous
 p.addParameter('alternativeModel','',@(x) (ischar(x) || iscell(x)));
 p.addParameter('verbose',[]);
+p.addParameter('include',[]);
+p.StructExpand = true;
 p.parse(tbl,formula,varargin{:});
 
 if isempty(p.Results.verbose)
@@ -88,14 +92,21 @@ if isempty(p.Results.verbose)
 else
     verbose = p.Results.verbose;
 end
-   
+
+if ~isempty(p.Results.include)
+    assert((islogical(p.Results.include) && numel(p.Results.include)==height(tbl)) || (isnumeric(p.Results.include) && all(p.Results.include<=height(tbl))),'The inlcusion criterio has invalid entries')
+    tbl = tbl(p.Results.include,:);
+end 
+
 if iscell(formula)
     % Convenience function to evaluate multiple formulas
     % with a recursive call to this function.
     nrFormulas= numel(formula);
     bf10 = nan(1,nrFormulas);
+    options =p.Results;
+    options.include = [];
     for i=1:nrFormulas
-        [bf10(i)] = bf.anova(tbl,formula{i});
+        [bf10(i)] = bf.anova(tbl,formula{i},options);
     end
     return;
 end
