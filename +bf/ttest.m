@@ -10,7 +10,6 @@ function [bf10,pValue,CI,stats] = ttest(X,varargin)
 %       [Defaults to 0]
 %
 % Optional Parm/Value pairs:
-% alpha - significance level for the frequentist test. [0.05]
 % tail - 'both','right', or 'left' for two or one-tailed tests [both]
 % scale - Scale of the Cauchy prior on the effect size  [sqrt(2)/2]
 % stats - A struct containing .tstat  , .df , .pvalue .tail and .N - This allows one to
@@ -47,37 +46,52 @@ else
     X=[];Y=[];
 end
 p=inputParser;
-p.addParameter('alpha',0.05);
 p.addParameter('tail','both',@(x) (ischar(x)&& ismember(upper(x),{'BOTH','RIGHT','LEFT'})));
 p.addParameter('scale',sqrt(2)/2);
 p.addParameter('stats',[],@isstruct);
+p.addParameter('T',[],@isnumeric);
+p.addParameter('df',[],@isnumeric);
 p.parse(parms{:});
 
+tail = p.Results.tail;
 
-if isempty(p.Results.stats)
+if isempty(p.Results.T)
     % Calculate frequentist from the X and Y data
-    tail = p.Results.tail;
-    [~,pValue,CI,stats] = ttest(X,Y,'alpha',p.Results.alpha,'tail',tail);
+    [~,pValue,CI,stats] = ttest(X,Y,'tail',tail);
     T = stats.tstat;
     df = stats.df;
     N = numel(X);
 else
-    % User specified outcome of frequentist test (the builtin ttest), calculate BF from T and
-    % df.
-    T = p.Results.stats.tstat;
-    df = p.Results.stats.df;
-    pValue = p.Results.stats.p;
-    tail  = p.Results.stats.tail;
-    N = p.Results.stats.N;
+    % User specified outcome of frequentist test (the builtin ttest);
+    % Calculate BF from T and df.
+    
+    T = p.Results.T;
+    df = p.Results.df;
+    
+    pValue = tcdf(T,df,'upper'); % Right tailed
+        switch upper(tail)
+            case 'BOTH'
+                pValue = 2*(1-pValue );
+            case 'LEFT'
+                pValue   =1-pValue ;
+            case 'RIGHT'
+                % Ok as is
+        end
+    
+    N = p.Results.df+1;     
     CI = [NaN NaN];
+    % Create stats struct to return the same output.
+    stats.tstat = T;
+    stats.df = df;
+    stats.sd = NaN;
+       
 end
 
 % Use the formula from Rouder et al.
-% This is the formula in that paper, but it does not use the
-% scale
-% numerator = (1+T.^2/(N-1)).^(-N/2);
+% This is the formula in that paper; it does not use the
+% scale numerator = (1+T.^2/(N-1)).^(-N/2);
 % fun  = @(g) ( ((1+N.*g).^-0.5) .* (1+T.^2./((1+N.*g).*(N-1))).^(-N/2) .* (2*pi).^(-1/2) .* g.^(-3/2).*exp(-1./(2*g))  );
-% This is with scale  (Checked against Morey's R package )
+% Here we use the scale  (Checked against Morey's R package )
 r = p.Results.scale;
 numerator = (1+T.^2/df).^(-(df+1)/2);
 fun  = @(g) ( ((1+N.*g.*r.^2).^-0.5) .* (1+T.^2./((1+N.*g.*r.^2).*df)).^(-(df+1)/2) .* (2*pi).^(-1/2) .* g.^(-3/2).*exp(-1./(2*g))  );
@@ -91,7 +105,7 @@ switch (tail)
     case 'both'
         % Nothing to do
     case {'left','right'}
-        % Adjust the BF using hte p-value as an estimate for the posterior
+        % Adjust the BF using the p-value as an estimate for the posterior
         % (Morey & Wagenmakers, Stats and Prob Letts. 92 (2014):121-124.
         bf10 = 2*(1-pValue)*bf10;
 end
