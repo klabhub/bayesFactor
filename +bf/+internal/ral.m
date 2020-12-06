@@ -162,88 +162,53 @@ classdef ral
             [v.sgn] =deal(ns{:});
         end
         
-        
-        function v = plus(o,x)
-            [o,x] = bf.internal.ral.matchup(o,x);
+        function [op,os,xp,xs] = getArrays(o,x)
             os = o.sgnArray;
-            xs = x.sgnArray;
-            
-            v = o;
-            v(o.isZero) = x(o.isZero);
-            
-            bothNeg = os ==-1 & xs ==-1;
-            if any(bothNeg)
-                v(bothNeg) = -(o(bothNeg).negative + x(bothNeg).negative);
+            op = o.pwrArray;
+            if bf.internal.ral.isral(x)
+                xs = x.sgnArray;            
+                xp = x.pwrArray;
+            else
+                xs = sign(x);
+                xp = log(abs(x));
             end
-            
-            xNeg = os==1 & xs==-1;
-            if any(xNeg)
-                v(xNeg) = o(xNeg) - x(xNeg).negative;
+            if numel(xs)==1
+                xs = repmat(xs,size(os));
+                xp = repmat(xp,size(os));
             end
+        end
+        function v = plus(o,x)
             
-            oNeg = os==-1 & xs ==1;
-            if any(oNeg)
-                v(oNeg)=x(oNeg) - o(oNeg).negative;
-            end
+            [op,os,xp,xs] = getArrays(o,x);
+            oGtx = o>x;
+            oLtx = o<x;
+            [np,ns] = bf.internal.ral.plusRal(op,os,xp,xs,oGtx,oLtx);
             
-            rest = ~(o.isZero|bothNeg|xNeg|oNeg);
-         
-            if any(rest)
-                p = num2cell(bf.internal.ral.logExpXPlusExpY(o(rest).pwrArray,x(rest).pwrArray));
-                [v(rest).sgn] = deal(1);
-                [v(rest).pwr] = deal(p{:});
-            end
+            v=o;
+            ns = num2cell(ns);
+            np = num2cell(np);
+            [v.sgn] = deal(ns{:});
+            [v.pwr] = deal(np{:});
+
         end
         
         
         
         function v= minus(o,x)
-            [o,x] = bf.internal.ral.matchup(o,x);
             
-            os = o.sgnArray;
-            xs = x.sgnArray;
+            [op,os,xp,xs] = getArrays(o,x);
+            oGtx = o>x;
+            oLtx = o<x;
+            [np,ns] = bf.internal.ral.minRal(op,os,xp,xs,oGtx,oLtx);
             
-            v = o;
-            v(o.isZero) = x(o.isZero).negative;
-            
-            bothNeg = os ==-1 & xs ==-1;
-            if any(bothNeg)
-                v(bothNeg) = o(bothNeg).abs.negative + x(bothNeg).abs;
-            end
-            
-            xNeg = os==1 & xs==-1;
-            if any(xNeg)
-                v(xNeg)  = o(xNeg) + x(xNeg).negative;
-            end
-            
-            oNeg = os==-1 & xs ==1;
-            if any(oNeg)
-                v(oNeg)= -(o(oNeg).negative + x(oNeg));
-            end
-            
-            rest = ~(o.isZero|x.isZero|bothNeg|xNeg|oNeg);
-            if any(rest)
-                oGtx = o>x;
-                restAndoGtx = rest & oGtx;
-                p = num2cell(bf.internal.ral.logExpXMinusExpY(o(restAndoGtx).pwrArray,x(restAndoGtx).pwrArray));
-                
-                [v(restAndoGtx).pwr] = deal(p{:});
-                [v(restAndoGtx).sgn] = deal(1);
-                oLtx = o<x;
-                restAndoLtx = rest & oLtx;
-                p = num2cell(bf.internal.ral.logExpXMinusExpY(x(restAndoLtx).pwrArray,o(restAndoLtx).pwrArray));
-               [ v(restAndoLtx).pwr] = deal(p{:});
-               [ v(restAndoLtx).sgn] = deal(-1);
-               
-                restSame = rest & ~(oGtx|oLtx);
-                
-                [v(restSame).pwr]  = deal(-inf);
-                [v(restSame).sgn]  = deal(0);
-                
-            end
+            v=o;
+            ns = num2cell(ns);
+            np = num2cell(np);
+            [v.sgn] = deal(ns{:});
+            [v.pwr] = deal(np{:});
             
         end
-        
+                        
         function v = times(o,x)
             [o,x] = bf.internal.ral.matchup(o,x);
             p = o.pwrArray+x.pwrArray;
@@ -272,7 +237,7 @@ classdef ral
             persistent warned
             if isempty(warned)
                 warned =true;
-                fprintf(2,'Matrix division for RAL not implemented yet...assuming you want to do .* instead of *');
+                fprintf(2,'Matrix division for RAL not implemented yet...assuming you want to do ./ instead of /');
             end
             v = rdivide(o,x);
         end
@@ -328,7 +293,7 @@ classdef ral
         
         function [m,s] = mstd(o,dim)
             % Determine mean and standard deviation
-            %https://www.johndcook.com/blog/standard_deviation/
+            % https://www.johndcook.com/blog/standard_deviation/
             nout = nargout;
             if nargin<2
                 dim=1;
@@ -357,7 +322,7 @@ classdef ral
                 for  i = 2:nrElms(1) 
                     % Loop over the first dimension
                     oldM =m;
-                    m = oldM + (o(i,allDims{:}) - oldM) ./ i;
+                    m = oldM + (o(i,allDims{:}) - oldM)./i;
                     if nout>1
                         s = s + (o(i,allDims{:}) - oldM ) * ( o(i,allDims{:}) - m );
                     end                    
@@ -400,9 +365,13 @@ classdef ral
         
         function  v = logExpXMinusExpY(x,y)
             % v = log(exp(x) - exp(y))
-            %   for x>y only
-            assert(all(x>y),'x>y for this formula');
-            v = x + log(1-exp(y-x));
+            %   
+            v = nan(size(x));
+            xGty = x>y;
+            v(xGty) = x(xGty) + log(1-exp(y(xGty)-x(xGty)));
+            xLty = x<y;
+            v(xLty) = y(xLty) + log(1-exp(x(xLty)-y(xLty)));
+            v(x==y) = -inf;
         end
         
         
@@ -418,6 +387,89 @@ classdef ral
             eq = y==x;
             v(eq) = log(2)+x(eq);            
         end
+        
+        function [np,ns] = plusRal(op,os,xp,xs,oGtx,oLtx)
+            np=op;
+            ns=os;
+            oIsZero = os==0;
+            xIsZero = xs==0;
+            ns(oIsZero) = xs(oIsZero);
+            np(oIsZero) = xp(oIsZero);
+            
+            bothNeg = os ==-1 & xs ==-1;
+            if any(bothNeg)
+                np(bothNeg) = bf.internal.ral.logExpXPlusExpY(op(bothNeg),xp(bothNeg));
+                ns(bothNeg) = -1;
+            end
+            
+            xNeg = os==1 & xs==-1;
+            if any(xNeg)
+                [np(xNeg),ns(xNeg)] = bf.internal.ral.minRal(op(xNeg),os(xNeg),xp(xNeg), -xs(xNeg),oLtx(xNeg),oGtx(xNeg));
+            end
+            
+            oNeg = os==-1 & xs ==1;
+            if any(oNeg)
+                [np(oNeg),ns(oNeg)] =bf.internal.ral.minRal(xp(oNeg),xs(oNeg),op(oNeg),-os(oNeg),oGtx(oNeg),oLtx(oNeg));
+            end
+            
+            bothPos = ~(oIsZero|xIsZero|bothNeg|xNeg|oNeg);  %       
+            if any(bothPos)
+                np(bothPos) = bf.internal.ral.logExpXPlusExpY(op(bothPos),xp(bothPos));
+                ns(bothPos) = 1;
+            end
+            
+            % Force sgn=0 for exp(-inf)
+            ns(isinf(np)&np<0) = 0;
+        end
+        
+        
+        
+        function [np,ns] = minRal(op,os,xp,xs,oGtx,oLtx)
+            np = op;
+            ns = os;
+            oIsZero  = os==0;
+            xIsZero = xs==0;
+            np(oIsZero) = xp(oIsZero);
+            ns(oIsZero) = -xs(oIsZero);
+            
+            bothNeg = os ==-1 & xs ==-1;
+            if any(bothNeg)
+               [np(bothNeg),ns(bothNeg)] = bf.internal.ral.plusRal(op(bothNeg),-abs(os(bothNeg)),xp(bothNeg),abs(xs(bothNeg)),oGtx(bothNeg),oLtx(bothNeg));
+            end
+            
+            xNeg = os==1 & xs==-1;
+            if any(xNeg)
+               [np(xNeg),ns(xNeg)] = bf.internal.ral.plusRal(op(xNeg),os(xNeg),xp(xNeg),-xs(xNeg),oGtx(xNeg),oLtx(xNeg));
+            end
+            
+            oNeg = os==-1 & xs ==1;
+            if any(oNeg)
+                [np(oNeg),ns(oNeg)] = bf.internal.ral.plusRal(op(oNeg),-os(oNeg),xp(oNeg),xs(oNeg),oGtx(oNeg),oLtx(oNeg));
+                ns(oNeg) = -ns(oNeg);
+            end
+            
+            bothPositive = ~(oIsZero|xIsZero|bothNeg|xNeg|oNeg);
+            if any(bothPositive)
+              %  oGtx = o>x;
+                restAndoGtx = bothPositive & oGtx;
+                np(restAndoGtx) = bf.internal.ral.logExpXMinusExpY(op(restAndoGtx),xp(restAndoGtx));
+                ns(restAndoGtx) = 1;
+
+               % oLtx = o<x;
+                restAndoLtx = bothPositive & oLtx;
+                np(restAndoLtx) = bf.internal.ral.logExpXMinusExpY(xp(restAndoLtx),op(restAndoLtx));
+                ns(restAndoLtx) = -1;
+                
+                restSame = bothPositive & ~(oGtx|oLtx);
+                np(restSame) = -inf;
+                ns(restSame) = 0;                
+            end
+            
+            % Force sgn=0 for exp(-inf)
+            ns(isinf(np)&np<0) = 0;
+
+        end
+        
         
         %% Static utility functions
         function v = isral(x)
@@ -450,8 +502,8 @@ classdef ral
             
             assert(all(a-a< tol,'all'),'Subtraction test Failed');
             assert(all(a+a - 2*r < tol,'all'),'Addition test Failed');
-            assert(all(mean((a*2 - 2*r))<tol),'Mean test failed');
-            assert(all(mean(a)-mean(r) < tol,'all'),'Mean test failed');
+            assert(all(mean((a.*2 - 2*r))<tol),'Mean test failed');
+            assert(all(mean(a,1)-mean(r,1) < tol,'all'),'Mean test failed');
             
         end
     end
