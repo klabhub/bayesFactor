@@ -113,20 +113,24 @@ classdef ral
         end
         
         function v = abs(o)
-            v= bf.internal.ral(o.pwrArray,ones(size(o)));
+            v= o;
+            [v.sgn] = deal(1);
         end
         
         function v = uminus(o)
             v = o.negative;
         end
         function v =negative(o)
-            v= bf.internal.ral(o.pwrArray,-o.sgnArray);
+            v =o;
+            ns = num2cell(-o.sgnArray);
+            [v.sgn] = deal(ns{:});            
         end
         
         function v = reciprocal(o)
-            v = bf.internal.ral(-o.pwrArray,o.sgnArray);
+            v =o;
+            np = num2cell(-o.pwrArray);
+            [v.pwr] = deal(np{:});              
         end
-        
         
         function v= power(o,e)
             assert(isa(e,'double'),'Exponent must be a double');
@@ -151,7 +155,11 @@ classdef ral
             rest= isnan(p);
             p(rest) = op(rest).*double(e(rest));
             s(rest) = os(rest);
-            v =bf.internal.ral(p,s);
+            np = num2cell(p);
+            ns = num2cell(s);
+            v = o;
+            [v.pwr] = deal(np{:});
+            [v.sgn] =deal(ns{:});
         end
         
         
@@ -160,9 +168,8 @@ classdef ral
             os = o.sgnArray;
             xs = x.sgnArray;
             
-            v = bf.internal.ral(nan(size(o)));
+            v = o;
             v(o.isZero) = x(o.isZero);
-            v(x.isZero) = o(x.isZero);
             
             bothNeg = os ==-1 & xs ==-1;
             if any(bothNeg)
@@ -179,7 +186,8 @@ classdef ral
                 v(oNeg)=x(oNeg) - o(oNeg).negative;
             end
             
-            rest = isnan(v);
+            rest = ~(o.isZero|bothNeg|xNeg|oNeg);
+         
             if any(rest)
                 p = num2cell(bf.internal.ral.logExpXPlusExpY(o(rest).pwrArray,x(rest).pwrArray));
                 [v(rest).sgn] = deal(1);
@@ -195,10 +203,9 @@ classdef ral
             os = o.sgnArray;
             xs = x.sgnArray;
             
-            v = bf.internal.ral(nan(size(o)));
-            
+            v = o;
             v(o.isZero) = x(o.isZero).negative;
-            v(x.isZero) = o(x.isZero);
+            
             bothNeg = os ==-1 & xs ==-1;
             if any(bothNeg)
                 v(bothNeg) = o(bothNeg).abs.negative + x(bothNeg).abs;
@@ -214,27 +221,25 @@ classdef ral
                 v(oNeg)= -(o(oNeg).negative + x(oNeg));
             end
             
-            rest = isnan(v);
+            rest = ~(o.isZero|x.isZero|bothNeg|xNeg|oNeg);
             if any(rest)
                 oGtx = o>x;
                 restAndoGtx = rest & oGtx;
                 p = num2cell(bf.internal.ral.logExpXMinusExpY(o(restAndoGtx).pwrArray,x(restAndoGtx).pwrArray));
                 
                 [v(restAndoGtx).pwr] = deal(p{:});
-                [v(restAndoGtx).sgn] = deal(1);%bf.internal.ral(p,ones(size(p)));
+                [v(restAndoGtx).sgn] = deal(1);
                 oLtx = o<x;
                 restAndoLtx = rest & oLtx;
                 p = num2cell(bf.internal.ral.logExpXMinusExpY(x(restAndoLtx).pwrArray,o(restAndoLtx).pwrArray));
                [ v(restAndoLtx).pwr] = deal(p{:});
                [ v(restAndoLtx).sgn] = deal(-1);
                
-%                v(restAndoLtx) = bf.internal.ral(p,-ones(size(p)));
                 restSame = rest & ~(oGtx|oLtx);
                 
                 [v(restSame).pwr]  = deal(-inf);
                 [v(restSame).sgn]  = deal(0);
                 
-%                = repmat(bf.internal.ral(0),size(v(restSame)));
             end
             
         end
