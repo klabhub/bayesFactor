@@ -62,6 +62,16 @@ classdef ral
             v = isnan(o.pwrArray);
         end
         
+        % needed for integration with @integral,
+        % but that would also require implemnting linear algebra...
+        % (mtimes)
+%         function v = isfloat(o)
+%             v = true;
+%         end
+%         function v=superiorfloat(o,x)
+%             v = 'double';
+%         end
+%         
         function v = double(o)
             % Convert a ral to a double. 
             % Of course this could result in Inf even when the ral is 
@@ -145,21 +155,21 @@ classdef ral
             if numel(e)==1
                 e = repmat(e,size(o));
             end
-            p = nan(size(o));
-            s = nan(size(o));
+            np = nan(size(o));
+            ns = nan(size(o));
             
             op  =o.pwrArray;
             os = o.sgnArray;
             
             zeroExp = e==0;
-            p(zeroExp) = 0;
-            s(zeroExp) = 1;
+            np(zeroExp) = 0;
+            ns(zeroExp) = 1;
             isEven = floor(e)==round(e) & mod(e,2)==0;
-            p(isEven) = op(isEven).*double(e(isEven));
-            s(isEven) = 1;
-            rest= isnan(p);
-            p(rest) = op(rest).*double(e(rest));
-            s(rest) = os(rest);
+            np(isEven) = op(isEven).*double(e(isEven));
+            ns(isEven) = 1;
+            rest= isnan(np);
+            np(rest) = op(rest).*double(e(rest));
+            ns(rest) = os(rest);
             v = copy(o,np,ns);
         end
         
@@ -555,6 +565,7 @@ classdef ral
         function v = isral(x)
             v = isa(x,'bf.internal.ral');
         end
+        
         
         function test
             % Run some tests to see everything is (still) working
