@@ -27,10 +27,6 @@ factoryDefault.verbose = true; % Show messages
 factoryDefault.useRal = false;  % Use the ral class (reprensent Reals As Logs) to improve numerical stability. 
 %                       This is used only for anova and is necessary for
 %                       problems with large number of observations. See rouderS.
-if factoryDefault.useRal &&  factoryDefault.nDimsForMC >1
-    warning('Using RAL only works for MC integration. Forcing MC.');
-    factoryDefault.nDimsForMC =1;
-end 
 factoryDefault.nrWorkers = 0;  % Set to zero to use serial execution (i.e. disable parfor loops in the code)   
 
 %% Check what we already have, and update if needed
@@ -56,7 +52,13 @@ if nargin>0
         machinePref.(fn{i}) = opt.(fn{i});
     end
 end
-    
+
+if machinePref.useRal &&  machinePref.nDimsForMC >1
+    warning('Using RAL only works for MC integration. Forcing MC.');
+    machinePref.nDimsForMC =1;
+end 
+
+
 
 if ~ispref('bayesFactor') || nargin>0 || factoryUpdate
     % First run : setup pref
