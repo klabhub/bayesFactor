@@ -10,15 +10,16 @@ function value= rouderS(g,y,X,grouping,continuousIx,options)
 
 
 [nrDims,nrPriorValues] = size(g);
-[N,nrEffects] = size(X);
+[N,nrEffects] = size(X); %#ok<ASGLU>
 
 if ~isempty(continuousIx)
     contX = X(:,continuousIx);
     contGMatrix = inv(contX'*contX/N);
 end
+
 % NOTE It would be nice to evaluate this on a GPU but the builtin gpuArray
 % cannot compute all, diag, det, etc, on the GPU using the gpuArray/arrayfun
-% Just putting all variables on the gpuArray (and not using arrayfun) 
+% Just putting all variables on the gpuArray (and not using arrayfun)
 % actually slows things down as a lot of copying takes place...
 
 nrObservations = size(X,1);
@@ -27,6 +28,10 @@ P0 = 1./nrObservations*(one*one');
 yTilde = (eye(nrObservations)-P0)*y;
 XTilde = (eye(nrObservations)-P0)*X;
 value= nan(1,nrPriorValues);
+if options.useRal
+    % Represent reals as logs to improve numerical stability
+    value= bf.internal.ral(value);
+end
 %parfor (i=1:nrPriorValues,options.nrWorkers)
 for i=1:nrPriorValues%,options.nrWorkers)
     if all(g(:,i)==0)
@@ -34,7 +39,7 @@ for i=1:nrPriorValues%,options.nrWorkers)
     else
         G=[];
         for grp= 1:nrDims
-            nrInDim = numel(grouping{grp});            
+            nrInDim = numel(grouping{grp});
             if all(ismember(grouping{grp},continuousIx))
                 % Continuous covariate
                 thisG = g(grp,i).*contGMatrix;
@@ -42,12 +47,19 @@ for i=1:nrPriorValues%,options.nrWorkers)
                 thisG = g(grp,i)*eye(nrInDim);
             end
             G = blkdiag(G,thisG);
-        end        
+        end
         Vg = XTilde'*XTilde + inv(G);
         yBar = one'*y/nrObservations;
-        preFactor= 1./(sqrt(det(G))*sqrt(det(Vg)));
-        numerator =    y'*y-nrObservations*yBar^2;
-        denominator = ((yTilde'*yTilde) -yTilde'*XTilde*(Vg\XTilde'*yTilde));
+       
+        if options.useRal
+            preFactor= bf.internal.ral(1./(sqrt(det(G))*sqrt(det(Vg))));
+            numerator =    bf.internal.ral(y'*y-nrObservations*yBar^2);
+            denominator = bf.internal.ral(((yTilde'*yTilde) -yTilde'*XTilde*(Vg\XTilde'*yTilde)));
+        else
+            preFactor= 1./(sqrt(det(G))*sqrt(det(Vg)));
+            numerator =    y'*y-nrObservations*yBar^2;
+            denominator = ((yTilde'*yTilde) -yTilde'*XTilde*(Vg\XTilde'*yTilde));
+        end
         value(i)= preFactor*(numerator/denominator).^((nrObservations-1)/2);
     end
 end
