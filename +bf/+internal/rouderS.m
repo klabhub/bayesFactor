@@ -60,7 +60,7 @@ for i=1:nrPriorValues%,options.nrWorkers)
             numerator =    y'*y-nrObservations*yBar^2;
             denominator = ((yTilde'*yTilde) -yTilde'*XTilde*(Vg\XTilde'*yTilde));
         end
-        value(i)= preFactor*(numerator/denominator).^((nrObservations-1)/2);
+        value(i)= preFactor.*(numerator./denominator).^((nrObservations-1)/2);
     end
 end
 end

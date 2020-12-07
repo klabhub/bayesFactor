@@ -24,5 +24,5 @@ end
 
 %% Evaluate the function at these g values
 bf10Samples = fun(g);
-v = double(mean(bf10Samples,2)); % Expectation value ~ integral. Converting to double as this could be a RAL
+v = mean(bf10Samples,2); % Expectation value over the samples = integral. 
 end
