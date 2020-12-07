@@ -51,7 +51,11 @@ function [bf10] = anova(tbl,formula,varargin)
 %           continuous covariates. Defaults to 1 for consistency with the
 %           Liang et al formula used  in bf.bfFromR2.
 % 'include' : logical address or index to include only certain rows from the
-% data. The default [] means 'use all rows'
+% data. The default [] means 'use all rows'. Note that by including a
+% subset of rows, you may remove an entire category from a categorical
+% variable; this will result in a warning when the design matrix is
+% constructed. Assuming that category was not part of the model, this
+% warning can be ignored.
 %
 % Note on Scales:
 % Either a single scale should be specified, or one scale per group of covariates
