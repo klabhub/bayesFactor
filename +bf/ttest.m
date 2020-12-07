@@ -4,6 +4,9 @@ function [bf10,pValue,CI,stats] = ttest(X,varargin)
 % function [bf10,p,CI,stats] = ttest(X,M,varargin)   -one sample,non-zero mean
 % function [bf10,p,CI,stats] = ttest(X,Y,varargin)   -paired samples
 %
+% function [bf10,p,CI,stats] = ttest('T',T,'df',df)   - calculate BF based
+% on regular ttest output
+%
 % INPUT 
 % X = single sample observations  (a column vector)
 % Y = paired observations (column vector) or a scalar mean to compare the samples in X to.
@@ -12,8 +15,10 @@ function [bf10,pValue,CI,stats] = ttest(X,varargin)
 % Optional Parm/Value pairs:
 % tail - 'both','right', or 'left' for two or one-tailed tests [both]
 % scale - Scale of the Cauchy prior on the effect size  [sqrt(2)/2]
-% stats - A struct containing .tstat  , .df , .pvalue .tail and .N - This allows one to
-%               calculate BF10 directly from the results of a standard T-Test output.
+% To calculated BF based on the outcome of a T-test, pass T and df as
+% parm/value pairs:
+% T - The T-value resulting from a standard T-Test output 
+% df - the degrees of freedom of the T-test
 %
 % OUTPUT
 % bf10 - The Bayes Factor for the hypothesis that the mean is different
@@ -48,7 +53,6 @@ end
 p=inputParser;
 p.addParameter('tail','both',@(x) (ischar(x)&& ismember(upper(x),{'BOTH','RIGHT','LEFT'})));
 p.addParameter('scale',sqrt(2)/2);
-p.addParameter('stats',[],@isstruct);
 p.addParameter('T',[],@isnumeric);
 p.addParameter('df',[],@isnumeric);
 p.parse(parms{:});

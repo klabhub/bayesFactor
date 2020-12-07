@@ -11,13 +11,8 @@ for n=N
     for t= T
         % We call the bf.ttest function directly with
         % the results of a t-test (e.g. as returned by ttest.m)
-        stats.tstat = t;
-        stats.df    = n-1;
-        stats.N     = n;  
-        stats.tail  = 'both';
-        stats.p     = NaN; % no tused
-        % Call the class member
-        bf10 = bf.ttest([],'stats',stats);
+                % Call the class member
+        bf10 = bf.ttest([],'T',t,'df',n-1,'tail','both');
         % Check whether we;ve reach any of the thresholds.
         % If so, store.
         if bf10>3 && isnan(criticalT(cntr,1))
