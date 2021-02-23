@@ -36,7 +36,7 @@ function [anovaPower,contrastPower,equivalencePower] = powerAnalysis(m,dummyVarC
 % BK -Dec 2020
 
 p=inputParser;
-p.addRequired('lm',@(x) isa(x,'GeneralizedLinearMixedModel'))
+p.addRequired('lm',@(x) isa(x,'LinearMixedModel'))
 p.addRequired('dummyVarCoding',@(x)(ischar(x) && ismember(upper(x),upper({'Effects','Reference'}))));
 p.addParameter('subjectVariable','subject',@ischar);
 p.addParameter('nrSubjects',10,@isnumeric);
@@ -46,7 +46,12 @@ p.addParameter('anovaTerm',m.anova.Term,@iscell);
 p.addParameter('contrast',[],@isnumeric); 
 p.addParameter('equivalence',{},@iscell);
 p.addParameter('nrWorkers',0,@isnumeric); % By default no parfor
+p.addParameter('fixedEffectsScale',[],@isnumeric);
 p.parse(m,dummyVarCoding,varargin{:});
+
+if any(m.ObservationInfo.Excluded)
+    error('This model has excluded some observations by using the ''Exclude'' argument to fitglme/fitlme. Please remove the data from the data table instead, then call fit without ''Exclude'' and then pass to this funciton');
+end
 
 if ~isempty(which('parfor_progress'))
     useParforProgress  = true; % Use parfor_pross
@@ -74,12 +79,29 @@ nrContrastsHack = max(nrContrasts,1);
 anovaPValue= nan(nrAnovaTerms,nrN,p.Results.nrMonteCarlo);
 contrastPValue= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 equivalencePValue = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
+if isempty(p.Results.fixedEffectsScale)
+    fixedEffectsScale = [];
+elseif numel(p.Results.fixedEffectsScale)==numel(m.fixedEffects)
+    % Same scaling for each observatin
+    fixedEffectsScale  = repmat(p.Results.fixedEffectsScale,[m.NumObservations 1]);    
+elseif all(size(p.Results.fixedEffectsScale)==[m.NumObservations numel(m.fixedEffects)])
+    % Each observation with its own scale
+    fixedEffectsScale  =p.Results.fixedEffectsScale;
+else
+    error(['The size of the fixed effect scaling [' num2str(size(p.Results.fixedEffectsScale)) '] does not match the data [' num2str([m.NumObservations numel(m.fixedEffects)]) ']'])
+end
+    
+if ~isempty(fixedEffectsScale)
+    assert(numel(m.covarianceParameters)==1 && numel(m.covarianceParameters{1})==1,'Effect scaling only works for a single random effect/grouping variable');
+end
 
 clc;
 startTime = tic;
 if useParforProgress
     parfor_progress(nrN*nrMonteCarlo);
 end
+designMatrixRE = designMatrix(m,'Random');
+
 parfor (n=1:nrN,nrWorkers)
     for i=1:nrMonteCarlo
          
@@ -89,8 +111,20 @@ parfor (n=1:nrN,nrWorkers)
         nrSubjectsSoFar = 0;
         simT= [];
         for s = 1:nrSims
-            simResponse = random(m); % This always generates nrSubjectsAvailable responses
-            % Use what we need           
+            % For each s we generates the same number of responses as in the original data.
+            % The builtin random function generates random effects as well
+            % as error on each call. So these are "new" subjects. In the
+            % manual calculation we do the same (while allowing some
+            % scaling of fixed effects)
+            if isempty(fixedEffectsScale)
+                simResponse = random(m); % Use built-in - it handles all random effecs, including multiple grouping.
+            else
+                % We are scaling fixed effects; only implemented for a
+                % single (subject) grouping va/random effect.
+                simRandomEffects = m.covarianceParameters{1}*randn([size(designMatrixRE,2) 1]);
+                simResponse = (designMatrix(m,'Fixed').*fixedEffectsScale)*m.fixedEffects + designMatrixRE*simRandomEffects + sqrt(m.MSE)*randn(height(m.Variables),1);             
+            end
+            % Use what we need, while making sure to sample a complete "data set" for each subject.           
             if s==nrSims
                 nrSubjectsNow = nrSubjectsToSimulate(n)- nrSubjectsSoFar;
             else
@@ -103,11 +137,15 @@ parfor (n=1:nrN,nrWorkers)
                 keep = ismember(m.Variables.(subjectVariable),sub);
                 thisSim = m.Variables(keep,:);
                 thisSim.(m.ResponseName) = simResponse(keep);
-                simT = [simT;thisSim]; 
+                simT = [simT;thisSim];  %#ok<AGROW>
             end
         end
         % Refit the model
-        lmSim =fitglme(simT,char(m.Formula),'Distribution',m.Distribution,'link',m.Link,'DummyVarCoding',dummyVarCoding);
+        if isa(m,'GeneralizedMixedModel')
+            lmSim =fitglme(simT,char(m.Formula),'Distribution',m.Distribution,'link',m.Link,'DummyVarCoding',dummyVarCoding);
+        else
+            lmSim =fitlme(simT,char(m.Formula),'DummyVarCoding',dummyVarCoding);
+        end
         
         %Evaluate standard anova and store pValues        
         for a = 1:nrAnovaTermsHack  % Hack is needed to trick the Matlab parfor parser in case nrAnovaTerms ==0
