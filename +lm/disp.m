@@ -10,11 +10,11 @@ function disp(m,factors,showEffects)
 % OUTPUT
 %
 % BK - Feb 2020
+if nargin<2 || isempty(factors)
+        factors =m.anova.Term(2:end);
+end
 if nargin <3
     showEffects = false;
-    if nargin<2 || isempty(factors)
-        factors =m.anova.Term(2:end);
-    end
 end
 
 if ischar(factors)
@@ -26,20 +26,25 @@ if ischar(factors)
 end
 
 fprintf('%s\n',m.Formula.char);
+partialEta = lm.partialEtaSquared(m);
+eta = ['partial ' char(hex2dec('03B7')) char(178)];
+precision = '%3.2g';
+
 for f=1:numel(factors)
     factor = factors{f};
     stay = strcmpi(m.anova.Term,factor);
-    fmt = '\t %s: F(%d,%d)=%3.2f,p=%3.3g';
-    vars = {factor,m.anova.DF1(stay,1),m.anova.DF2(stay,1),m.anova.FStat(stay,1),m.anova.pValue(stay,1)};
+    
+    fmt = ['\t %s: F(%d,%d)=' precision ',p=' precision ' ' eta ' = ' precision];    
+    vars = {factor,m.anova.DF1(stay,1),m.anova.DF2(stay,1),m.anova.FStat(stay,1),m.anova.pValue(stay,1),partialEta(stay)};
     if m.anova.pValue(stay,1) <0.05
         style = 2; % Error output stream ; red
     else
         style =1; % stdout; 
     end
     if showEffects
-        fmt = cat(2, fmt ,' (%3.3f )');
+        fmt = cat(2, fmt ,[' (Effect: ' precision ' CI [' precision ' ' precision '] )']);
         fe = m.fixedEffects;
-        vars = cat(2,vars,{fe(stay)});
+        vars = cat(2,vars,{fe(stay),m.Coefficients.Lower(stay),m.Coefficients.Upper(stay)});
     end
     fprintf(style,[fmt '\n'],vars{:});    
 end
