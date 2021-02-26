@@ -1,19 +1,22 @@
 function [eta,lowerEta,upperEta] = partialEtaSquared(varargin)
 % Returns the partial eta squared for each of the terms in the linear
 % model, based on the ANOVA table.
+%
 % Assumes that each term in the model is a manipu;ated/controlled
 % independent variable, and not a covariate
+% 
 % INPUT
-% 'lm' = Alinear model
+% 'lm' = A linear model
 % OR 
 % 'F' = The F statistic
 % 'df1' = Effect degrees of Freedom
 % 'df2' - Error degrees of freedom.
 % 'alpha' = Significance level for confidence intervals. [0.1] (i..e 90% CI
 %           is default)
-% 'nrSteps'  How many steps to use in the search for the bounds. This
-%               determines the "resolution" of the bounds.  [1000]
-%           There is a tradeoff with speed.
+% 'tol'  =  Confidence bounds are determined with this tolerance on the bounds. 
+%           The default is 0.005 which is in the same units as eta, so corresponds to 
+%           a tolerance of 0.5% variance explained. Setting this smaller slows the
+%           computation down.
 % OUTPUT
 % v = The partial eta squared.
 % lowerEta = The lower bound on the confidence interval
@@ -26,7 +29,7 @@ p.addParameter('F',[]);
 p.addParameter('df1',[]);
 p.addParameter('df2',[]);
 p.addParameter('alpha',0.1);
-p.addParameter('nrSteps',1000);
+p.addParameter('etaStep',0.005);
 p.parse(varargin{:});
 
 if ~isempty(p.Results.lm)    
@@ -40,26 +43,22 @@ else
 end
 
 eta = F.*u./(F.*u+v);
-FToDelta = @(f,U,V) (f.*(U./V).*(U+V+1)); 
+
 if nargout>1    
     nrEtas = numel(eta);
     lowerEta = nan(size(eta));
-    upperEta = nan(size(eta));
-    delta = F.*(u./v).*(u+v+1);% Non centrality parameter delta
+    upperEta = nan(size(eta));    
     for i=1:nrEtas        
-        rangeOfDeltas =linspace(0,delta(i),p.Results.nrSteps); % Search up to delta.
-        upperDelta = rangeOfDeltas(find(ncfinv((1-p.Results.alpha/2),u(i),v(i),rangeOfDeltas)>=F(i),1,'first'));
-        lowerEta(i) = upperDelta./(upperDelta+u(i)+v(i)+1);
+        etaRange = 0:p.Results.etaStep:eta(i);  % This is the range of etas that we will test for LB: up to eta in steps of etaStep
+        rangeOfDeltas = etaRange.*(u(i)+v(i)+1)./(1-etaRange);        % Convert to delta (noncentrality parameter)
+        upperDelta = rangeOfDeltas(find(ncfinv((1-p.Results.alpha/2),u(i),v(i),rangeOfDeltas)>=F(i),1,'first')); % Find alpha%
+        lowerEta(i) = upperDelta./(upperDelta+u(i)+v(i)+1); % Convert back to eta
     end
 end
 if nargout >2
     for i=1:nrEtas
-        % Estimate what the largest possible upperDelta will be ; that will
-        % setup the search range. Not sure whether this always works. But
-        % the assert will catch it if it doesn't.
-        stopF = ncfinv(1-p.Results.alpha*0.0005,u(i),v(i),delta(i));
-        stopDelta = stopF.*u(i)./v(i).*(u(i)+v(i)+1);
-        rangeOfDeltas =linspace(delta(i),stopDelta,p.Results.nrSteps);
+        etaRange = eta(i):p.Results.etaStep:(1-p.Results.etaStep); % Search from eta and upward
+        rangeOfDeltas = etaRange.*(u(i)+v(i)+1)./(1-etaRange);
         upperDelta = rangeOfDeltas(find(ncfinv(p.Results.alpha/2,u(i),v(i),rangeOfDeltas)<=F(i),1,'last'));
         assert(upperDelta < max(rangeOfDeltas),'Search range for upper bound was too small. Change the heuristic...');            
         upperEta(i) = upperDelta./(upperDelta+u(i)+v(i)+1);
