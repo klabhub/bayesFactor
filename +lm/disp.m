@@ -26,15 +26,14 @@ if ischar(factors)
 end
 
 fprintf('%s\n',m.Formula.char);
-[partialEta,partialEtaLB,partialEtaUB] = lm.partialEtaSquared('lm',m);
+[partialEta,partialEtaLB,partialEtaUB] = lm.partialEtaSquared(m);
 eta = ['partial ' char(hex2dec('03B7')) char(178)];
-precision = '%3.2g';
 
 for f=1:numel(factors)
     factor = factors{f};
     stay = strcmpi(m.anova.Term,factor);
     
-    fmt = ['\t %s: F(%d,%d)=' precision ',p=' precision ' ' eta ' = ' precision ' CI: [' precision ',' precision ']'];    
+    fmt = ['\t %s: F(%d,%d)=%3.1f, p=%3.2g,' eta '=%3.3g CI: [%4.4g, %4.4g]'];    
     vars = {factor,m.anova.DF1(stay,1),m.anova.DF2(stay,1),m.anova.FStat(stay,1),m.anova.pValue(stay,1),partialEta(stay),partialEtaLB(stay),partialEtaUB(stay)};
     if m.anova.pValue(stay,1) <0.05
         style = 2; % Error output stream ; red
@@ -42,7 +41,7 @@ for f=1:numel(factors)
         style =1; % stdout; 
     end
     if showEffects
-        fmt = cat(2, fmt ,[' (Effect: ' precision ' CI [' precision ' ' precision '] )']);
+        fmt = cat(2, fmt ,[' (Effect: %3.3g  CI [%4.4g, %4.4g])']);
         fe = m.fixedEffects;
         vars = cat(2,vars,{fe(stay),m.Coefficients.Lower(stay),m.Coefficients.Upper(stay)});
     end
