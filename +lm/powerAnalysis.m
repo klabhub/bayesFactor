@@ -1,11 +1,9 @@
-function [anovaPower,contrastPower,equivalencePower] = powerAnalysis(m,dummyVarCoding,varargin)
+function [anovaPower,contrastPower,equivalencePower] = powerAnalysis(m,varargin)
 % Simulate a linear mixed model to generate a power analysis for factors in
 % the model, specific posthoc contrasts, or tests of equivalence.
 % 
 % INPUT
 % lm  =  A linear model with pilot data
-% dummyVarCoding = The coding used for categorical variables in the model
-%                   (Effects or Reference)
 % Parm/Value pairs:
 % subjectVariable  - the name of the variable in the lm that contains the
 % subject  ID. [subject].
@@ -37,7 +35,6 @@ function [anovaPower,contrastPower,equivalencePower] = powerAnalysis(m,dummyVarC
 
 p=inputParser;
 p.addRequired('lm',@(x) isa(x,'LinearMixedModel'))
-p.addRequired('dummyVarCoding',@(x)(ischar(x) && ismember(upper(x),upper({'Effects','Reference'}))));
 p.addParameter('subjectVariable','subject',@ischar);
 p.addParameter('nrSubjects',10,@isnumeric);
 p.addParameter('nrMonteCarlo',100,@isnumeric);
@@ -47,7 +44,7 @@ p.addParameter('contrast',[],@isnumeric);
 p.addParameter('equivalence',{},@iscell);
 p.addParameter('nrWorkers',0,@isnumeric); % By default no parfor
 p.addParameter('fixedEffectsScale',[],@isnumeric);
-p.parse(m,dummyVarCoding,varargin{:});
+p.parse(m,varargin{:});
 
 if any(m.ObservationInfo.Excluded)
     error('This model has excluded some observations by using the ''Exclude'' argument to fitglme/fitlme. Please remove the data from the data table instead, then call fit without ''Exclude'' and then pass to this funciton');
@@ -58,7 +55,7 @@ if ~isempty(which('parfor_progress'))
 else
     useParforProgress  =false; % Show dots as signs of life.
 end
-
+dummyVarCoding = lm.dummyVarCoding(m);
 % Extract from p to avoid broadcasting and initialize outputs
 nrSubjectsToSimulate= p.Results.nrSubjects(:)';
 nrWorkers = p.Results.nrWorkers;

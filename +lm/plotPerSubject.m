@@ -1,12 +1,10 @@
-function [effects,ci] = plotPerSubject(m,dummyVarCoding)
+function [effects,ci] = plotPerSubject(m)
 % For a given linear model based on one or more subjects, refit the model
 % per subject and show the results to get an idea of variability in the
 % sample.
 %
 % INPUT
 % glm -  a (generalized) linear mixed model
-% dummyVarCoding - 'effects', 'reference', or 'full', use the same setting
-% as one used for the group fitglme
 %
 % OUTPUT
 % effects  - table with fixed effects. First row is the group, the other
@@ -17,6 +15,7 @@ function [effects,ci] = plotPerSubject(m,dummyVarCoding)
 
 NUMPRECISION =3; % num2str for effects
 
+dummyVarCoding = lm.dummyVarCoding(m);
 
 %% Createa a table of fixed effects and confidence intervals
 fe = m.fixedEffects;
@@ -29,14 +28,57 @@ ci(1,:) = [];
 cis  = table(ci,'RowNames',feNames,'VariableNames',{'Group'});
 
 %% Now fit each subject separately and add to the tables
-T = m.Variables;
-subjects = unique(cellstr(T.subject(~m.ObservationInfo.Excluded))); % only keep subjects who're relevant to this condition
+% 
+T = m.Variables(:,m.VariableInfo.InModel | ismember(m.VariableNames,m.Formula.ResponseName));
+subjects = unique(cellstr(T.subject)); % only keep subjects who're relevant to this condition
 formula = m.Formula.char;
+stay  =m.VariableInfo.InModel & ~ismember(m.VariableNames,[m.Formula.GroupingVariableNames{:}]);
+varTypes = m.VariableInfo.Class(stay);
+varNames = m.VariableNames(stay);
+switch upper(dummyVarCoding)
+    case {'REFERENCE','EFFECTSFIRST'}
+        matchIx = height(T);
+    case {'REFERENCELAST','EFFECTS'}
+        matchIx = 1;
+    otherwise 
+        warning('Not tested for  %s coding',dummyVarCoding);
+end
+rowToMatch = T(matchIx,:);
 for s=subjects'
     try
-        thisGlm = fitglme(T,formula,'FitMethod',m.FitMethod,'Distribution',...
-            m.Distribution,'Link',m.Link,'DummyVarCoding',dummyVarCoding,...
-            'Exclude',m.ObservationInfo.Excluded | ~strcmpi(cellstr(T.subject),s{1}));
+        % Extract the relevant subset of data for this subjects
+        thisT = T(~m.ObservationInfo.Excluded | strcmpi(cellstr(T.subject),s{1}),:);        
+        % We have to order this such that the same variable serves as the
+        % reference/left-out parameter.
+        for r=1:numel(varNames)
+            type = varTypes{r};
+            switch(type)
+                case 'cell'
+                    comp = @ismember;
+                    otherwise
+                    comp = @eq;
+            end
+            thisStay = comp(thisT.(varNames{r}),rowToMatch.(varNames{r}));
+            if r==1 
+                stay = thisStay;
+            else
+                stay = stay & thisStay;
+            end
+        end        
+        ix  = find(stay,1,'first');
+        if isempty(ix)
+            error('Subject %s does not have the condition that is left out of the model in the population fit.Skipped',s{1});
+        end
+        if matchIx==1
+            %First value serves as reference : Prepend
+            thisT = cat(1,thisT(ix,:),thisT(setdiff(1:height(thisT),ix),:));
+        else
+            % Last value serves as referrence : Append
+            thisT = cat(1,thisT(setdiff(1:height(thisT),ix),:),thisT(ix,:));
+        end
+        % Refit for this subject
+        thisGlm = fitglme(thisT,formula,'FitMethod',m.FitMethod,'Distribution',...
+            m.Distribution,'Link',m.Link,'DummyVarCoding',dummyVarCoding) ;
         fe = thisGlm.fixedEffects;
         fe(1) =[]; % Remove intercept
         thisFeNames = thisGlm.CoefficientNames;
@@ -50,9 +92,10 @@ for s=subjects'
         disp(['perSubject lmm for ' formula ' failed on ' s{1}])
         continue
     end
-    if ~all(strcmpi(feNames,thisFeNames)) % not all levels are matched with the group fit
-        error('coefficientNames of individual fit NOT matched with group fit! (check ''dummyVarCoding'' settings)')
-    end
+    %Sanity check that the order of FE is the same in the per subject and
+    %group model
+    assert(all(strcmpi(feNames,thisFeNames)),'coefficientNames of individual fit NOT matched with group fit! (check ''dummyVarCoding'' settings)');
+     
 end
 
 %% Visualize the main group and individual results
