@@ -1,4 +1,4 @@
-function [T,X] = allConditions(m)
+function [T,X] = conditions(m)
 % Return a table in which each row is a specific condition in the lienar model
 % Grouping variables are ignored -i.e. fixed effects only.
 % INPUT

@@ -1,4 +1,4 @@
-function [p,T,df,delta] = tost(m,dummyVarCoding, A,B,bounds)
+function [p,T,df,delta] = tost(m,A,B,bounds)
 % Post-hoc equivalence test for two conditions in a linear model.
 % This is based on the two-one sided tests (TOST) approach. 
 % See Schuirmann 1987,Lakens 2017 for a tutorial treatment.
@@ -26,7 +26,6 @@ function [p,T,df,delta] = tost(m,dummyVarCoding, A,B,bounds)
 %
 % INPUT
 % m =  linear model
-% dummyVarCoding= The coding used for categorical variables in the model.
 % A  =  Cell array specifying condition A (see lm.posthoc)
 % B =  Cell array specifying condition B (see lm.posthoc)
 % bounds= Bounds for the smallest effect size of interest (SESOI). For
@@ -46,7 +45,7 @@ function [p,T,df,delta] = tost(m,dummyVarCoding, A,B,bounds)
 % T = table(MPG,Weight,Model_Year,Cylinders);
 % T.Cylinders = nominal(T.Cylinders);
 % glme = fitglme(T,'MPG ~ Weight + Cylinders + (1|Model_Year)','Distribution','Normal','DummyVarCoding','Effects')
-% [p,stat,df,delta] = lm.tost(glme,'Effects','Cylinders_8','Cylinders_6',[-1 1]);
+% [p,stat,df,delta] = lm.tost(glme,{'Cylinders',8},{'Cylinders',6},[-1 1]);
 % p = 0.23 -> Showing that we can ***not*** conclude they are equivalent.
 % (i.e. not reject the null hypothesis that the true differences lie outside the
 % [-1 1] interval).
@@ -61,9 +60,9 @@ if numel(bounds) ~=2
     error('TOST requires both an upper and a lower equivalence bound.');
 end
 % Is A-B surprisingly larger than the lower bound
-[pLB,tLB,df,delta] = lm.posthoc(m,dummyVarCoding,A,B,min(bounds),'right');
+[pLB,tLB,df,delta] = lm.posthoc(m,A,B,min(bounds),'right');
 % Or surprisingly smaller than the upper bound
-[pUB,tUB] = lm.posthoc(m,dummyVarCoding,A,B,max(bounds),'left');
+[pUB,tUB] = lm.posthoc(m,A,B,max(bounds),'left');
 % Keep the least significant of the two one-sided tests.
 if pUB < pLB
     p = pLB;
@@ -77,7 +76,8 @@ end
 
 if false
     %% Test the code with the example in Lakens 2017, page 357
-    %  Generate statistically identical data
+    %  Results are similar (this uses randn so it cannot be a 
+    % perfect match). Lakens has t(182) = 2.69, p = .004
     nControl = 95;
     nOrganic = 89;
     control = 5.25 + 0.95*randn(nControl,1);
@@ -101,7 +101,7 @@ if false
         statManual = tL;
     end
     % Now compare the manual results with the klm code.
-    [pKlm,statKlm,dfKlm] = lm.tost(m,'effects','food_organic','food_control',bound*[-1 1]);
+    [pKlm,statKlm,dfKlm] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
     
     fprintf('Manual : t(%d)= %3.3f, p= %3.3f,  KLM: t(%d)= %3.3f, p= %3.3f',dfManual,statManual,pManual,dfKlm,statKlm,pKlm)
 end

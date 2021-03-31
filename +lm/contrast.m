@@ -19,10 +19,11 @@ end
 
 import lm.*
 if isa(A,'table')
+    % Use the conditions specified in the table.
     TA =A;
     defaultA = {};
 else
-    %% First create tables that define the conditions specified by A and (if requested ) B.
+    %% Create tables that define the conditions specified by A and (if requested ) B.
     varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
     varNames = m.VariableNames(m.VariableInfo.InModel);
     defaultValues = m.Variables(1,m.VariableInfo.InModel);% First row in the data is the default
@@ -31,7 +32,7 @@ else
     TA = fillTable(varTypes,varNames,TA,A); % Replace default with values specified in A
 end
 
-% Fill B
+% Same for condition B
 if nargin >2 && ~isempty(B)
     if isa(B,'table')
         TB = B;
@@ -61,7 +62,7 @@ dvCoding = lm.dummyVarCoding(m);
     'DummyVarCoding', dvCoding, ...
     'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
     'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-
+% Remove the terms that depend on the (arbitrary) default valuse
 for i=1:numel(defaultA)
     defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultA{i})));
     if ~isempty(defaultTerms)
@@ -70,6 +71,7 @@ for i=1:numel(defaultA)
     end
 end
 
+%% Same for B if requested.
 if nargin <3 || isempty(B)
     vB = zeros(size(vA));
 else
