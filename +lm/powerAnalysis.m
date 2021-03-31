@@ -34,13 +34,13 @@ function [anovaPower,contrastPower,equivalencePower] = powerAnalysis(m,varargin)
 % BK -Dec 2020
 
 p=inputParser;
-p.addRequired('lm',@(x) isa(x,'LinearMixedModel'))
+p.addRequired('lm',@(x) (isa(x,'GeneralizedLinearMixedModel') || isa(x,'LinearMixedModel')))
 p.addParameter('subjectVariable','subject',@ischar);
 p.addParameter('nrSubjects',10,@isnumeric);
 p.addParameter('nrMonteCarlo',100,@isnumeric);
 p.addParameter('alpha',0.05,@isnumeric); % Significance level
 p.addParameter('anovaTerm',m.anova.Term,@iscell);
-p.addParameter('contrast',[],@isnumeric); 
+p.addParameter('contrast',{},@iscell); 
 p.addParameter('equivalence',{},@iscell);
 p.addParameter('nrWorkers',0,@isnumeric); % By default no parfor
 p.addParameter('fixedEffectsScale',[],@isnumeric);
@@ -161,7 +161,7 @@ parfor (n=1:nrN,nrWorkers)
             if nrContrastsHack >nrContrasts
                 break;
             else
-                contrastPValue(c,n,i)= coefTest(lmSim,contrast(c,:)); %#ok<PFBNS>
+                contrastPValue(c,n,i)= lm.posthoc(lmSim,contrast{c,:}); %#ok<PFBNS>
             end
         end
         
@@ -171,7 +171,7 @@ parfor (n=1:nrN,nrWorkers)
             if nrEquivalenceTestsHack >nrEquivalenceTests
                 break;
             else
-                equivalencePValue(e,n,i) = lm.tost(lmSim,'Effects',equivalence{e,:}); %#ok<PFBNS>
+                equivalencePValue(e,n,i) = lm.tost(lmSim,equivalence{e,:}); %#ok<PFBNS>
             end
         end
                              

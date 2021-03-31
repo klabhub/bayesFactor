@@ -54,7 +54,11 @@ if nin <6
 end
 
 %% Determine the estimate using the linear model FE
-c  = lm.contrast(m,A,B); % the linear contrast
+if isnumeric(A) && isnumeric(B)
+    c =A-B;
+else
+    c  = lm.contrast(m,A,B); % the linear contrast
+end
 delta = c*m.fixedEffects;
 debugStr = strcat(m.CoefficientNames', ' : ' , cellstr(num2str(c')));
 predictedDelta = predictedDelta(:).*ones(size(delta));

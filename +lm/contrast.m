@@ -62,6 +62,9 @@ dvCoding = lm.dummyVarCoding(m);
     'DummyVarCoding', dvCoding, ...
     'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
     'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
+if any(ismissing(vA))
+    error('The A condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+end
 % Remove the terms that depend on the (arbitrary) default valuse
 for i=1:numel(defaultA)
     defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultA{i})));
@@ -80,7 +83,9 @@ else
         'DummyVarCoding', dvCoding, ...
         'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
         'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-    
+    if any(ismissing(vB))
+        error('The B condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+    end
     for i=1:numel(defaultB)
         defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultB{i})));
         if ~isempty(defaultTerms)
