@@ -1,4 +1,4 @@
-function v = contrast(m,A,B,defineDifference)
+function [v,TA,TB] = contrast(m,A,B,defineDifference)
 % Specify two conditions A and B using cell arrays of parm/value pairs to
 % retreive the contrast vector A-B.
 %

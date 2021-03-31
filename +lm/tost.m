@@ -1,4 +1,4 @@
-function [p,T,df,delta] = tost(m,A,B,bounds)
+function [p,T,df,delta,ci] = tost(m,A,B,bounds)
 % Post-hoc equivalence test for two conditions in a linear model.
 % This is based on the two-one sided tests (TOST) approach. 
 % See Schuirmann 1987,Lakens 2017 for a tutorial treatment.
@@ -60,16 +60,18 @@ if numel(bounds) ~=2
     error('TOST requires both an upper and a lower equivalence bound.');
 end
 % Is A-B surprisingly larger than the lower bound
-[pLB,tLB,df,delta] = lm.posthoc(m,A,B,min(bounds),'right');
+[pLB,tLB,df,delta,ciLB] = lm.posthoc(m,A,B,min(bounds),'right');
 % Or surprisingly smaller than the upper bound
-[pUB,tUB] = lm.posthoc(m,A,B,max(bounds),'left');
+[pUB,tUB,~,~,ciUB] = lm.posthoc(m,A,B,max(bounds),'left');
 % Keep the least significant of the two one-sided tests.
 if pUB < pLB
     p = pLB;
     T = tLB;
+    ci  =ciLB;
 else
     p =pUB;
     T =tUB;
+    ci = ciUB;
 end
 
 
@@ -101,7 +103,7 @@ if false
         statManual = tL;
     end
     % Now compare the manual results with the klm code.
-    [pKlm,statKlm,dfKlm] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
+    [pKlm,statKlm,dfKlm,delta,ci] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
     
-    fprintf('Manual : t(%d)= %3.3f, p= %3.3f,  KLM: t(%d)= %3.3f, p= %3.3f',dfManual,statManual,pManual,dfKlm,statKlm,pKlm)
+    fprintf('\n Manual : t(%d)= %3.3f, p= %3.3f,  \n LM: t(%d)= %3.3f, p= %3.3f, \n delta: %3.3f  (%d%% CI: [%3.3f %3.3f ])\n',dfManual,statManual,pManual,dfKlm,statKlm,pKlm,delta,100*(1-alpha),ci)
 end
