@@ -1,4 +1,4 @@
-function [p,T,df,delta,ci] = tost(m,A,B,bounds)
+function [p,T,df,delta,ci,str] = tost(m,A,B,bounds,alpha)
 % Post-hoc equivalence test for two conditions in a linear model.
 % This is based on the two-one sided tests (TOST) approach. 
 % See Schuirmann 1987,Lakens 2017 for a tutorial treatment.
@@ -31,11 +31,14 @@ function [p,T,df,delta,ci] = tost(m,A,B,bounds)
 % bounds= Bounds for the smallest effect size of interest (SESOI). For
 % superiority/inferiority equivalence tests, one of the bounds can be inf
 % or -inf.
+% alpha -  Significance level.
 %
 % OUTPUT
 % p,T,df associated with the test with highest p-value
 % delta = the actual difference between A and B
-%
+% ci =  1-alpha confidence internval
+% str = Char showing the results in a paper ready format.
+% 
 % EXAMPLE
 % Fit a model with two fixed-effect predictors and a random
 %             effect. Test whether 8 and 6 cylinder cars have essentially
@@ -55,23 +58,27 @@ function [p,T,df,delta,ci] = tost(m,A,B,bounds)
 
 %%
 % BK - Feb 2021
-
+if nargin <5
+    alpha = 0.05;
+end
 if numel(bounds) ~=2
     error('TOST requires both an upper and a lower equivalence bound.');
 end
 % Is A-B surprisingly larger than the lower bound
-[pLB,tLB,df,delta,ciLB] = lm.posthoc(m,A,B,min(bounds),'right');
+[pLB,tLB,df,delta,ciLB,strLB] = lm.posthoc(m,A,B,min(bounds),'right',alpha);
 % Or surprisingly smaller than the upper bound
-[pUB,tUB,~,~,ciUB] = lm.posthoc(m,A,B,max(bounds),'left');
+[pUB,tUB,~,~,ciUB,strUB] = lm.posthoc(m,A,B,max(bounds),'left',alpha);
 % Keep the least significant of the two one-sided tests.
 if pUB < pLB
     p = pLB;
     T = tLB;
     ci  =ciLB;
+    str = strLB;
 else
     p =pUB;
     T =tUB;
     ci = ciUB;
+    str= strLB;
 end
 
 
@@ -103,7 +110,7 @@ if false
         statManual = tL;
     end
     % Now compare the manual results with the klm code.
-    [pKlm,statKlm,dfKlm,delta,ci] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
+    [pKlm,statKlm,dfKlm,delta,ci,str] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
     
-    fprintf('\n Manual : t(%d)= %3.3f, p= %3.3f,  \n LM: t(%d)= %3.3f, p= %3.3f, \n delta: %3.3f  (%d%% CI: [%3.3f %3.3f ])\n',dfManual,statManual,pManual,dfKlm,statKlm,pKlm,delta,100*(1-alpha),ci)
+    fprintf('\n Manual : t(%d)= %3.3f, p= %3.3f,  \n LM Package: %s\n',dfManual,statManual,pManual,str)
 end

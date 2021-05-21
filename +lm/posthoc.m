@@ -1,4 +1,4 @@
-function [p,stat,df,delta,CI,c,debugStr] = posthoc(m,A,B,predictedDelta,tail,alpha)
+function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail,alpha)
 % Perform a posthoc comparison of condition A and B in a Linear Mixed Model,
 % using coefTest, but using cell arrays of parm/value pairs to specify conditions A and B
 % instead of the contrast
@@ -19,6 +19,7 @@ function [p,stat,df,delta,CI,c,debugStr] = posthoc(m,A,B,predictedDelta,tail,alp
 % df                = Error degrees of freedom (see coefTest)
 % delta             = The difference.
 % ci                = The 1-alpha confidence interval
+% str                = A char that gives the full stats in a publication  ready format
 % contrast          = The contrast used for this test.
 % debugStr          = Contrast shown together with coefficient names to
 %                       help understand why the contrast is the way it is...
@@ -54,7 +55,10 @@ if nin <6
 end
 
 %% Determine the estimate using the linear model FE
-if isnumeric(A) && isnumeric(B)
+if isnumeric(A)
+    if nin < 3
+        B =zeros(size(A));
+    end
     c =A-B;
 else
     c  = lm.contrast(m,A,B); % the linear contrast
@@ -66,11 +70,16 @@ if ~all(size(delta)==size(predictedDelta))
     error('Predicted delta [nrRows nrCols] has to match the expected delta');
 end
 
+if size(delta,1)>1 && ~strcmpi(tail,'both')
+    error('One-sided posthoc tests are only defined for conditions, not for factors');
+end
+
 %% Assess statistical significance using F or T
 switch upper(tail)
     case 'BOTH'
         % Two-sided tests - use the built-in F test.
         [p,stat,~,df] = coefTest(m,c,predictedDelta);
+        statName= 'F';
     case {'LEFT','RIGHT'}
         cov  = c*m.CoefficientCovariance*c';
         stat = (delta-predictedDelta)/sqrt(cov);
@@ -80,21 +89,23 @@ switch upper(tail)
         else
             p = 1-tcdf(stat,m.DFE);
         end
+        statName= 'T';
     otherwise
         error('%s is not a valid tail specification',tail);
 end
 
 %% Alpha CI
 if nargout > 4
-    % Compute 1-alpha simultaneous confidence intervals, only if requested
-    variance = sum(c .* (c*m.CoefficientCovariance'),2);
-    % Extra variance to predict a new "observation" instead of the curve variance = variance + (m.Dispersion)^2;  %
-    % Using 'residuals' df
-    df = (m.NumObservations- m.NumEstimatedCoefficients );
-    % Simultaneous : criterion = sqrt( m.NumEstimatedCoefficients*finv(1-alpha,m.NumEstimatedCoefficients,df) );
-    % Point
-    criterion = tinv(1-alpha/2,df);
-    updown= criterion.*sqrt(variance);
+    % Compute 1-alpha point estmate confidence intervals, only if requested .
+    cov  = c*m.CoefficientCovariance*c';    
+    criterion = tinv(1-alpha/2,m.DFE);
+    updown= criterion.*sqrt(cov);
     CI = [delta - updown, delta + updown];
 end
+
+if nargout > 5
+    % Report string
+    str = sprintf('%s(%d) = %.3f, p= %.g, delta= %.1f ms (%d%% CI [%.1f %.1f])\n',statName,df,stat,p,delta,100*(1-alpha),CI);
+end
+
 end
