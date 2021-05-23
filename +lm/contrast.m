@@ -77,6 +77,7 @@ end
 %% Same for B if requested.
 if nargin <3 || isempty(B)
     vB = zeros(size(vA));
+    vB(1) = 1; % Intercept only
 else
     bTerms = terms;
     [vB,~,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TB,'Model',bTerms, ...
