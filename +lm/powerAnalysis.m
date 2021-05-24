@@ -208,18 +208,21 @@ close(hWaithBar);
 anovaPower = nanmean(anovaPValue<p.Results.alpha,3)';
 contrastPower = nanmean(contrastPValue<p.Results.alpha,3)';
 equivalencePower = nanmean(equivalencePValue<p.Results.alpha,3)';
+
+
 h=[];
-if p.Results.graph
-    
+
+%% Show graphical results
+if p.Results.graph    
     %Interpolate subjects for the graph
-    iSubjects= min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate);
+    iSubjects= (min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate))';
     powerValues = {anovaPower,contrastPower,equivalencePower};
     for i=1:3
         if ~isempty(powerValues{i})
-            iPower = interp1(nrSubjectsToSimulate,powerValues{i},iSubjects,'makima');
+            iPower = interp1(nrSubjectsToSimulate,powerValues{i},iSubjects,'pchip');
             
             % Binomial confidence intervals
-            [x,ci] = binofit(powerValues{i}(:)*nrMonteCarlo,nrMonteCarlo);
+            [x,ci] = binofit(round(powerValues{i}(:)*nrMonteCarlo),nrMonteCarlo);
             neg = reshape(x-ci(:,1),size(powerValues{i}));
             pos = reshape(ci(:,2)-x,size(powerValues{i}));
             
@@ -234,8 +237,8 @@ if p.Results.graph
         end
         xlabel '#Subjects'
         ylabel 'Power'
-        set(gca,'YLim',[0 1])
+        set(gca,'YLim',[0 1],'XTick',nrSubjectsToSimulate)
     end
-    
+    drawnow;
 end
 end
