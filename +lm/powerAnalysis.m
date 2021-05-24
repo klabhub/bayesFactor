@@ -95,12 +95,22 @@ cntr =0;
     end
 afterEach(dataQueue,@updateWaitBar);
 
-for (n=1:nrN)%,nrWorkers)
-    
-    for i=1:nrMonteCarlo
+
+if ~isempty(fixedEffectsScale)
+    % Hack to get access to the private slme member of m
+    st= warning('query');
+    warning('off', 'MATLAB:structOnObject'); % Avoid the warning
+    modelStruct = struct(m);
+    warning(st);
+else
+    modelStruct = []; %Not used 
+end
+
+parfor (i=1:nrMonteCarlo,nrWorkers) % Parfor for the largest number
+    for n=1:nrN
         
         % Generate surrogate data based on the model
-        subjectsToKeep = randi(nrSubjectsAvailable,[nrSubjectsToSimulate(n) 1]); % Sample subjects with replacement
+        subjectsToKeep = randi(nrSubjectsAvailable,[nrSubjectsToSimulate(n) 1]); %#ok<PFBNS> % Sample subjects with replacement
         nrSims = ceil(nrSubjectsToSimulate(n)/nrSubjectsAvailable);
         nrSubjectsSoFar = 0;
         simT= [];
@@ -115,33 +125,28 @@ for (n=1:nrN)%,nrWorkers)
                 simResponse = random(m); % Use built-in - it handles all random effecs, including multiple grouping.
             else
                 % We are scaling fixed effects
-                    % Hack to get access to the private slme member of m
-                    st= warning('query');
-                    warning('off', 'MATLAB:structOnObject'); % Avoid the warning
-                    modelStruct = struct(m);
-                    warning(st);
-                    
-                    %Modify the design matrix with the fixed effect scaling
-                    X = modelStruct.slme.X .* fixedEffectsScale;        
-                    subset       = modelStruct.ObservationInfo.Subset;
-                    % Then use code copied from
-                    % (Generalized)LinearMixedModel/random
-                    % To call random on the slme                                        
-                    if isa(m,'LinearMixedModel')
-                        ysim = random(modelStruct.slme,[],X,modelStruct.slme.Z);                                                 
-                        w = modelStruct.ObservationInfo.Weights;                  
-                        w = w(subset);
-                        ysim = ysim ./ sqrt(w);                      
-                    elseif isa(m,'GeneralizedLinearMixedModel')                                                    
-                        wp      = modelStruct.slme.PriorWeights;
-                        delta   = modelStruct.slme.Offset;
-                        ntrials = modelStruct.slme.BinomialSize;
-                        ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);                    
-                    else 
-                        error('Unknown model??');
-                    end
-                    simResponse= NaN(length(subset),1);
-                    simResponse(subset) = ysim;             
+                %Modify the design matrix with the fixed effect scaling
+                X = modelStruct.slme.X .* fixedEffectsScale; %#ok<PFBNS>
+                subset       = modelStruct.ObservationInfo.Subset;
+                % Then use code copied from
+                % (Generalized)LinearMixedModel/random
+                % To call random on the slme
+                if isa(m,'LinearMixedModel')
+                    ysim = random(modelStruct.slme,[],X,modelStruct.slme.Z);
+                    w = modelStruct.ObservationInfo.Weights;
+                    w = w(subset);
+                    ysim = ysim ./ sqrt(w);
+                elseif isa(m,'GeneralizedLinearMixedModel')
+                    wp      = modelStruct.slme.PriorWeights;
+                    delta   = modelStruct.slme.Offset;
+                    ntrials = modelStruct.slme.BinomialSize;
+                    ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);
+                else
+                    ysim =[]; %#ok<NASGU> % Make the parfor parser happy.
+                    error('Unknown model??');
+                end
+                simResponse= NaN(length(subset),1);
+                simResponse(subset) = ysim;
             end
             % Use what we need, while making sure to sample a complete "data set" for each subject.
             if s==nrSims
@@ -215,7 +220,7 @@ equivalencePower = nanmean(equivalencePValue<p.Results.alpha,3)';
 h=[];
 
 %% Show graphical results
-if p.Results.graph    
+if p.Results.graph
     %Interpolate subjects for the graph
     iSubjects= (min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate))';
     powerValues = {anovaPower,contrastPower,equivalencePower};
@@ -228,11 +233,11 @@ if p.Results.graph
             neg = reshape(x-ci(:,1),size(powerValues{i}));
             pos = reshape(ci(:,2)-x,size(powerValues{i}));
             
-            hE = errorbar(repmat(nrSubjectsToSimulate',[1 size(powerValues{i},2)]),powerValues{i},neg,pos,[ 'o']);
+            hE = errorbar(repmat(nrSubjectsToSimulate',[1 size(powerValues{i},2)]),powerValues{i},neg,pos,'o');
             hold on
             for j=1:numel(hE)
                 h = [h  plot(iSubjects,iPower(:,j),'LineWidth',2,'Color',hE(j).Color)];             %#ok<AGROW>
-            end            
+            end
         end
         xlabel '#Subjects'
         ylabel 'Power'
@@ -240,7 +245,7 @@ if p.Results.graph
     end
     if ~isempty(p.Results.names )
         legend(h,p.Results.names)
-    end        
+    end
     drawnow;
 end
 end
