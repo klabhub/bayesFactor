@@ -1,4 +1,4 @@
-function [anovaPower,contrastPower,equivalencePower,h] = powerAnalysis(m,varargin)
+function [anovaPower,contrastPower,equivalencePower,hWaithBar] = powerAnalysis(m,varargin)
 % Simulate a linear mixed model to generate a power analysis for factors in
 % the model, specific posthoc contrasts, or tests of equivalence.
 %
@@ -25,11 +25,6 @@ function [anovaPower,contrastPower,equivalencePower,h] = powerAnalysis(m,varargi
 % contrastPower - Power for each row specified in contrast
 % equivalencePower - Power for reach row in equivalence
 %
-% NOTE
-% With long/parfor evaluation, getting some updates on progress is useful. This
-% script uses parfor_progress (See Matlab File exchange) for this if it is
-% found on the path. If this funciton is not found, progress is indicated
-% by dots printing to the screen.
 %
 % BK -Dec 2020
 
@@ -52,11 +47,6 @@ if any(m.ObservationInfo.Excluded)
     error('This model has excluded some observations by using the ''Exclude'' argument to fitglme/fitlme. Please remove the data from the data table instead, then call fit without ''Exclude'' and then pass to this funciton');
 end
 
-if ~isempty(which('parfor_progress'))
-    useParforProgress  = true; % Use parfor_pross
-else
-    useParforProgress  =false; % Show dots as signs of life.
-end
 dummyVarCoding = lm.dummyVarCoding(m);
 % Extract from p to avoid broadcasting and initialize outputs
 nrSubjectsToSimulate= p.Results.nrSubjects(:)';
@@ -94,14 +84,19 @@ if ~isempty(fixedEffectsScale)
     assert(numel(m.covarianceParameters)==1 && numel(m.covarianceParameters{1})==1,'Effect scaling only works for a single random effect/grouping variable');
 end
 
-clc;
-startTime = tic;
-if useParforProgress
-    parfor_progress(nrN*nrMonteCarlo);
-end
 
+% Use a dataqueue to show progress updates
+dataQueue = parallel.pool.DataQueue;
+hWaithBar = waitbar(0,['Power analysis for ' m.Formula.char ]);
+cntr =0;
+    function updateWaitBar(~)
+        cntr=  cntr+1;
+        waitbar(cntr/(nrN*nrMonteCarlo),hWaithBar);
+    end
+afterEach(dataQueue,@updateWaitBar);
 
 parfor (n=1:nrN,nrWorkers)
+    
     for i=1:nrMonteCarlo
         
         % Generate surrogate data based on the model
@@ -115,8 +110,8 @@ parfor (n=1:nrN,nrWorkers)
             % The builtin random function generates random effects as well
             % as error on each call. So these are "new" subjects. In the
             % manual calculation we do the same (while allowing some
-            % scaling of fixed effects)            
-            if isempty(fixedEffectsScale)                
+            % scaling of fixed effects)
+            if isempty(fixedEffectsScale)
                 simResponse = random(m); % Use built-in - it handles all random effecs, including multiple grouping.
             else
                 % We are scaling fixed effects
@@ -125,22 +120,22 @@ parfor (n=1:nrN,nrWorkers)
                     simResponse = random(m,designMatrix(m,'Fixed').*fixedEffectsScale,designMatrix(m,'Random'));
                 else %Generalized LMM don't have this option.
                     % Hack to get access to the private slme member of m
-                  %  if s==1
-                        % Only have to do this once.
-                        st= warning('query'); 
-                        warning('off', 'MATLAB:structOnObject'); % Avoid the warning
-                        modelStruct = struct(m);
-                        warning(st);
-                   % end
+                    %  if s==1
+                    % Only have to do this once.
+                    st= warning('query');
+                    warning('off', 'MATLAB:structOnObject'); % Avoid the warning
+                    modelStruct = struct(m);
+                    warning(st);
+                    % end
                     %Modify the design matrix with the fixed effect scaling
-                    X = modelStruct.slme.X .* fixedEffectsScale; 
+                    X = modelStruct.slme.X .* fixedEffectsScale;
                     % Then use code copied from
-                    % GeneralizedLinearMixedModel/random 
+                    % GeneralizedLinearMixedModel/random
                     % To call random on the slme
                     wp      = modelStruct.slme.PriorWeights;
                     delta   = modelStruct.slme.Offset;
-                    ntrials = modelStruct.slme.BinomialSize;                    
-                    ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);                    
+                    ntrials = modelStruct.slme.BinomialSize;
+                    ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);
                     subset       = modelStruct.ObservationInfo.Subset;
                     simResponse= NaN(length(subset),1);
                     simResponse(subset) = ysim;
@@ -162,7 +157,7 @@ parfor (n=1:nrN,nrWorkers)
                 % Assign a new ID to each subject
                 thisSim.(subjectVariable) = repmat(categorical(subjectNr),[sum(keep) 1]);
                 subjectNr = subjectNr +1;
-                simT = [simT;thisSim];  
+                simT = [simT;thisSim];
             end
         end
         % Refit the model
@@ -203,25 +198,19 @@ parfor (n=1:nrN,nrWorkers)
             end
         end
         
-        if useParforProgress
-            it = parfor_progress;
-            showTimeToCompletion( it/100, [], [], startTime );
-        else
-            fprintf('.');
-        end
+        % Update the data queue
+        send(dataQueue,(n-1)+i);
     end
 end
 
-if ~useParforProgress
-    fprintf('\n');
-end
+close(hWaithBar);
 
 anovaPower = nanmean(anovaPValue<p.Results.alpha,3)';
 contrastPower = nanmean(contrastPValue<p.Results.alpha,3)';
 equivalencePower = nanmean(equivalencePValue<p.Results.alpha,3)';
 h=[];
 if p.Results.graph
-
+    
     %Interpolate subjects for the graph
     iSubjects= min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate);
     powerValues = {anovaPower,contrastPower,equivalencePower};
@@ -239,14 +228,14 @@ if p.Results.graph
             for j=1:numel(hE)
                 h = [h  plot(iSubjects,iPower(:,j),'LineWidth',2,'Color',hE(j).Color)];             %#ok<AGROW>
             end
+            if ~isempty(p.Results.names )
+                legend(h,p.Results.names)
             end
-        if ~isempty(p.Results.names )
-            legend(h,p.Results.names)
         end
-        
         xlabel '#Subjects'
         ylabel 'Power'
         set(gca,'YLim',[0 1])
     end
     
+end
 end

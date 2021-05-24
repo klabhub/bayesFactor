@@ -1,5 +1,5 @@
-function disp(m,factors,showEffects)
-% Convenience disp function to show Anova results of a Linear model in 
+function disp(m,factors,showEffects,tol)
+% Convenience disp function to show Anova results of a linear model in 
 % standard notation for easy copy and paste.
 %
 % INPUT
@@ -7,14 +7,19 @@ function disp(m,factors,showEffects)
 % factors = a cell array of factors whose stats are to be shown. Defaults
 % to all but the Intercept.
 % showEffects = Show effect sizes too.[false]
+% tol = Tolerance for partial eta squared confidence intervals
 % OUTPUT
-%
+% output is written to the command line only.
+% 
 % BK - Feb 2020
 if nargin<2 || isempty(factors)
         factors =m.anova.Term(2:end);
 end
 if nargin <3
     showEffects = false;
+end
+if nargin <4
+    tol =0.001;
 end
 
 if ischar(factors)
@@ -26,7 +31,7 @@ if ischar(factors)
 end
 
 fprintf('%s\n',m.Formula.char);
-[partialEta,partialEtaLB,partialEtaUB] = lm.partialEtaSquared(m);
+[partialEta,partialEtaLB,partialEtaUB] = lm.partialEtaSquared(m,'tol',tol);
 eta = ['partial ' char(hex2dec('03B7')) char(178)];
 
 for f=1:numel(factors)
