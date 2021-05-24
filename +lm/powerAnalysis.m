@@ -95,7 +95,7 @@ cntr =0;
     end
 afterEach(dataQueue,@updateWaitBar);
 
-parfor (n=1:nrN,nrWorkers)
+for (n=1:nrN)%,nrWorkers)
     
     for i=1:nrMonteCarlo
         
@@ -115,31 +115,33 @@ parfor (n=1:nrN,nrWorkers)
                 simResponse = random(m); % Use built-in - it handles all random effecs, including multiple grouping.
             else
                 % We are scaling fixed effects
-                if isa(m,'LinearMixedModel')
-                    % For lmm random takes a modified deisng matrix
-                    simResponse = random(m,designMatrix(m,'Fixed').*fixedEffectsScale,designMatrix(m,'Random'));
-                else %Generalized LMM don't have this option.
                     % Hack to get access to the private slme member of m
-                    %  if s==1
-                    % Only have to do this once.
                     st= warning('query');
                     warning('off', 'MATLAB:structOnObject'); % Avoid the warning
                     modelStruct = struct(m);
                     warning(st);
-                    % end
+                    
                     %Modify the design matrix with the fixed effect scaling
-                    X = modelStruct.slme.X .* fixedEffectsScale;
-                    % Then use code copied from
-                    % GeneralizedLinearMixedModel/random
-                    % To call random on the slme
-                    wp      = modelStruct.slme.PriorWeights;
-                    delta   = modelStruct.slme.Offset;
-                    ntrials = modelStruct.slme.BinomialSize;
-                    ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);
+                    X = modelStruct.slme.X .* fixedEffectsScale;        
                     subset       = modelStruct.ObservationInfo.Subset;
+                    % Then use code copied from
+                    % (Generalized)LinearMixedModel/random
+                    % To call random on the slme                                        
+                    if isa(m,'LinearMixedModel')
+                        ysim = random(modelStruct.slme,[],X,modelStruct.slme.Z);                                                 
+                        w = modelStruct.ObservationInfo.Weights;                  
+                        w = w(subset);
+                        ysim = ysim ./ sqrt(w);                      
+                    elseif isa(m,'GeneralizedLinearMixedModel')                                                    
+                        wp      = modelStruct.slme.PriorWeights;
+                        delta   = modelStruct.slme.Offset;
+                        ntrials = modelStruct.slme.BinomialSize;
+                        ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);                    
+                    else 
+                        error('Unknown model??');
+                    end
                     simResponse= NaN(length(subset),1);
-                    simResponse(subset) = ysim;
-                end
+                    simResponse(subset) = ysim;             
             end
             % Use what we need, while making sure to sample a complete "data set" for each subject.
             if s==nrSims
@@ -230,15 +232,15 @@ if p.Results.graph
             hold on
             for j=1:numel(hE)
                 h = [h  plot(iSubjects,iPower(:,j),'LineWidth',2,'Color',hE(j).Color)];             %#ok<AGROW>
-            end
-            if ~isempty(p.Results.names )
-                legend(h,p.Results.names)
-            end
+            end            
         end
         xlabel '#Subjects'
         ylabel 'Power'
         set(gca,'YLim',[0 1],'XTick',nrSubjectsToSimulate)
     end
+    if ~isempty(p.Results.names )
+        legend(h,p.Results.names)
+    end        
     drawnow;
 end
 end
