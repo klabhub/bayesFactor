@@ -1,6 +1,6 @@
-function [v,TA,TB] = contrast(m,A,B,defineDifference)
+function [v,TA,TB] = contrast(m,A,B,defineDifference,scale)
 % Specify two conditions A and B using cell arrays of parm/value pairs to
-% retreive the contrast vector A-B.
+% retreive the contrast weights vector A-B.
 %
 % INPUT
 % m - The linear model
@@ -9,12 +9,19 @@ function [v,TA,TB] = contrast(m,A,B,defineDifference)
 %       which case the function returns the vector defining A.
 % defineDifference = When set tot true, the B cell array specifies only those
 %           variables that are different in B. [true]
+% scale -  Set this to true to scale the weights such that sum(abs(v)) ==2.
+% This puts the contrast score on the same scale as the original means
+% (Kirk, 1995). [false]
+% 
 % OUTPUT
 % v = The contrast correspoonding to A-B
 %
 % BK - Mar 2021
-if nargin<4
-    defineDifference =true;
+if nargin<5
+    scale = false;
+    if nargin<4
+        defineDifference =true;
+    end
 end
 
 import lm.*
@@ -99,7 +106,9 @@ end
 % The contrast is the difference between the two vectors
 % This removes the influence of the default values.
 v =vA-vB;
-
+if scale
+    v = v ./(0.5*sum(abs(v)));
+end
 end
 
 function TX= fillTable(varTypes,varNames,TX,X)
@@ -108,8 +117,10 @@ for i = 1:numel(varNames)
     if numel(ix)==1
         thisVal = convert(X{2*(ix-1)+2},varTypes{i});
         TX.(varNames{i}) = thisVal;
+    elseif numel(ix)==0
+        %nothing to do (probably a random effect)
     else
-        
+        error('?');
     end
 end
 end
@@ -118,8 +129,8 @@ function val = convert(val,type)
 if ~isa(val,type)
     if isa(val,'char') && strcmpi(type,'categorical')
         val = categorical({val});
-    elseif isa(val,'char')  && strcmpi(type,'cell')
-        val = {val};
+    elseif isa(val,'char') ||isa(val,'string') && strcmpi(type,'cell')
+        val = {char(val)};
     else
         val =feval(type,val);
     end

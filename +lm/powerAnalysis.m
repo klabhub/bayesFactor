@@ -1,4 +1,4 @@
-function [anovaPower,contrastPower,equivalencePower,hWaithBar] = powerAnalysis(m,varargin)
+function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnalysis(m,varargin)
 % Simulate a linear mixed model to generate a power analysis for factors in
 % the model, specific posthoc contrasts, or tests of equivalence.
 %
@@ -10,6 +10,10 @@ function [anovaPower,contrastPower,equivalencePower,hWaithBar] = powerAnalysis(m
 % nrSubjects: speciy the vector of subject sample sizes to investigate
 % nrMonteCarlo -  MC simulations per sample size. [100]
 % alpha - significance level
+% qcFunction - This should be a function that takes a data table (of the
+% same kind as used in the original fit(g)lme and returns a pruned data
+% table. If specified, this function is applied to each simulated data set
+% to ensure the same quality control as for the real experiment.
 %
 % Power Analysis will be done for the following model terms:
 % anovaTerm - Cell array with anova terms
@@ -17,6 +21,10 @@ function [anovaPower,contrastPower,equivalencePower,hWaithBar] = powerAnalysis(m
 % equivalence - Cell array where each row defines an equivalence test
 %               {A,B,bounds}; see lm.tost
 % nrWorkers = The number of workers for parfor [0]
+% graph - set to true to show the results in graphical form [false]
+% names - Name each of the model terms (anova terms, contrasts,
+% equivalences, in that order) - used only by the legend of the graph.
+% 
 % OUTPUT
 % Each row corresponds to a number of simulated subjects, each column to a
 % term/contrast/equivalence test.
@@ -24,7 +32,7 @@ function [anovaPower,contrastPower,equivalencePower,hWaithBar] = powerAnalysis(m
 % anovaPower - Power for each factor specified in anovaTerm
 % contrastPower - Power for each row specified in contrast
 % equivalencePower - Power for reach row in equivalence
-%
+% deltaContrast - Actual delta computed for each contrast .
 %
 % BK -Dec 2020
 
@@ -39,6 +47,7 @@ p.addParameter('contrast',{},@iscell);
 p.addParameter('equivalence',{},@iscell);
 p.addParameter('nrWorkers',0,@isnumeric); % By default no parfor
 p.addParameter('fixedEffectsScale',[],@isnumeric);
+p.addParameter('qcFunction',@(x)(x),@(x)isa(x,'function_handle')); % Apply QC to each simulated set.
 p.addParameter('graph',false,@islogical);
 p.addParameter('names',{},@iscell);
 p.parse(m,varargin{:});
@@ -67,7 +76,9 @@ nrContrasts = size(contrast,1);
 nrContrastsHack = max(nrContrasts,1);
 anovaPValue= nan(nrAnovaTerms,nrN,p.Results.nrMonteCarlo);
 contrastPValue= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
+deltaContrast = nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 equivalencePValue = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
+qcFunction  =p.Results.qcFunction;
 if isempty(p.Results.fixedEffectsScale)
     fixedEffectsScale = [];
 elseif numel(p.Results.fixedEffectsScale)==numel(m.fixedEffects)
@@ -80,18 +91,15 @@ else
     error(['The size of the fixed effect scaling [' num2str(size(p.Results.fixedEffectsScale)) '] does not match the data [' num2str([m.NumObservations numel(m.fixedEffects)]) ']'])
 end
 
-if ~isempty(fixedEffectsScale)
-    assert(numel(m.covarianceParameters)==1 && numel(m.covarianceParameters{1})==1,'Effect scaling only works for a single random effect/grouping variable');
-end
-
 
 % Use a dataqueue to show progress updates
 dataQueue = parallel.pool.DataQueue;
 hWaithBar = waitbar(0,['Power analysis for ' m.Formula.char ]);
 cntr =0;
+nrTotal = nrN*nrMonteCarlo;
     function updateWaitBar(~)
         cntr=  cntr+1;
-        waitbar(cntr/(nrN*nrMonteCarlo),hWaithBar);
+        waitbar(cntr/nrTotal,hWaithBar);
     end
 afterEach(dataQueue,@updateWaitBar);
 
@@ -106,14 +114,15 @@ else
     modelStruct = []; %Not used 
 end
 
-parfor (i=1:nrMonteCarlo,nrWorkers) % Parfor for the largest number
+parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
+%for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN
         
         % Generate surrogate data based on the model
         subjectsToKeep = randi(nrSubjectsAvailable,[nrSubjectsToSimulate(n) 1]); %#ok<PFBNS> % Sample subjects with replacement
         nrSims = ceil(nrSubjectsToSimulate(n)/nrSubjectsAvailable);
         nrSubjectsSoFar = 0;
-        simT= [];
+        simT= table; % Start with empty table
         subjectNr = 0;
         for s = 1:nrSims
             % For each s we generates the same number of responses as in the original data.
@@ -164,9 +173,14 @@ parfor (i=1:nrMonteCarlo,nrWorkers) % Parfor for the largest number
                 % Assign a new ID to each subject
                 thisSim.(subjectVariable) = repmat(categorical(subjectNr),[sum(keep) 1]);
                 subjectNr = subjectNr +1;
-                simT = [simT;thisSim];
+                simT = [simT; thisSim]; 
             end
         end
+        if ~isempty(qcFunction)
+            % Apply quality control function to the simulated data set.
+            simT = qcFunction(simT);
+        end
+        
         % Refit the model
         if isa(m,'GeneralizedLinearMixedModel')
             lmSim =fitglme(simT,char(m.Formula),'Distribution',m.Distribution,'link',m.Link,'DummyVarCoding',dummyVarCoding);
@@ -191,7 +205,7 @@ parfor (i=1:nrMonteCarlo,nrWorkers) % Parfor for the largest number
             if nrContrastsHack >nrContrasts
                 break;
             else
-                contrastPValue(c,n,i)= lm.posthoc(lmSim,contrast{c,:}); %#ok<PFBNS>
+                [contrastPValue(c,n,i),~,~,deltaContrast(c,n,i)] = lm.posthoc(lmSim,contrast{c,:}); %#ok<PFBNS>
             end
         end
         

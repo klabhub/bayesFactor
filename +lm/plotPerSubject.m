@@ -30,7 +30,9 @@ cis  = table(ci,'RowNames',feNames,'VariableNames',{'Group'});
 %% Now fit each subject separately and add to the tables
 % 
 T = m.Variables(:,m.VariableInfo.InModel | ismember(m.VariableNames,m.Formula.ResponseName));
-subjects = unique(cellstr(T.subject)); % only keep subjects who're relevant to this condition
+T.subject = categorical(T.subject);
+subjects = unique(T.subject); % only keep subjects who're relevant to this condition
+
 formula = m.Formula.char;
 stay  =m.VariableInfo.InModel & ~ismember(m.VariableNames,[m.Formula.GroupingVariableNames{:}]);
 varTypes = m.VariableInfo.Class(stay);
@@ -47,7 +49,7 @@ rowToMatch = T(matchIx,:);
 for s=subjects'
     try
         % Extract the relevant subset of data for this subjects
-        thisT = T(~m.ObservationInfo.Excluded | strcmpi(cellstr(T.subject),s{1}),:);        
+        thisT = T(~m.ObservationInfo.Excluded & T.subject==s,:);        
         % We have to order this such that the same variable serves as the
         % reference/left-out parameter.
         for r=1:numel(varNames)
@@ -67,7 +69,7 @@ for s=subjects'
         end        
         ix  = find(stay,1,'first');
         if isempty(ix)
-            error('Subject %s does not have the condition that is left out of the model in the population fit.Skipped',s{1});
+            error('Subject %s does not have the condition that is left out of the model in the population fit.Skipped',s);
         end
         if matchIx==1
             %First value serves as reference : Prepend
@@ -84,12 +86,13 @@ for s=subjects'
         thisFeNames = thisGlm.CoefficientNames;
         thisFeNames(1) = [];
         
-        effects = [effects   table(fe,'VariableNames',{['s' s{1}]})]; %#ok<AGROW>
+        effects = [effects   table(fe,'VariableNames',{['s' char(s)]})]; %#ok<AGROW>
         ci = [thisGlm.Coefficients.Lower thisGlm.Coefficients.Upper];
         ci(1,:) = [];
-        cis  = [cis table(ci,'VariableNames',{['s' s{1}]})];%#ok<AGROW>
+        cis  = [cis table(ci,'VariableNames',{['s' char(s)]})];%#ok<AGROW>
     catch
-        disp(['perSubject lmm for ' formula ' failed on ' s{1}])
+        disp(['perSubject lmm for ' formula ' failed on :'])
+        s
         continue
     end
     %Sanity check that the order of FE is the same in the per subject and
