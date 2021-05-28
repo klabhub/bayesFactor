@@ -18,3 +18,5 @@ For bug reports, code issues, or feature request, please submit a new Issue on G
 ## Contact Info
 Bart Krekelberg - bart@vision.rutgers.edu
 
+To cite, please use
+[![DOI](https://zenodo.org/badge/162604707.svg)](https://zenodo.org/badge/latestdoi/162604707)
