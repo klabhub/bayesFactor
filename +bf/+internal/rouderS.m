@@ -32,14 +32,14 @@ if options.useRal
     % Represent reals as logs to improve numerical stability
     value= bf.internal.ral(value);
 end
-%parfor (i=1:nrPriorValues,options.nrWorkers)
-for i=1:nrPriorValues%,options.nrWorkers)
+parfor (i=1:nrPriorValues,options.nrWorkers)
+%for i=1:nrPriorValues%,options.nrWorkers)
     if all(g(:,i)==0)
         value(i)=0;
     else
         G=[];
         for grp= 1:nrDims
-            nrInDim = numel(grouping{grp});
+            nrInDim = numel(grouping{grp}); %#ok<PFBNS>
             if all(ismember(grouping{grp},continuousIx))
                 % Continuous covariate
                 thisG = g(grp,i).*contGMatrix;
@@ -51,7 +51,7 @@ for i=1:nrPriorValues%,options.nrWorkers)
         Vg = XTilde'*XTilde + inv(G);
         yBar = one'*y/nrObservations;
        
-        if options.useRal
+        if options.useRal %#ok<PFBNS>
             preFactor= bf.internal.ral(1./(sqrt(det(G))*sqrt(det(Vg))));
             numerator =    bf.internal.ral(y'*y-nrObservations*yBar^2);
             denominator = bf.internal.ral(((yTilde'*yTilde) -yTilde'*XTilde*(Vg\XTilde'*yTilde)));

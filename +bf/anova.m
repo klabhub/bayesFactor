@@ -59,7 +59,11 @@ function [bf10] = anova(tbl,formula,varargin)
 %
 % Note on Scales:
 % Either a single scale should be specified, or one scale per group of covariates
-% that share a prior.
+% that share a prior.  Also note that the definition of scale is not the
+% same in every paper and other software packages (e.g. JASP) may parameterize a scale 
+% that this package calls 2 as sqrt(2).
+% Please take this into account when comparing results from this toolbox with 
+% other packages.
 %
 %
 % OUTPUT

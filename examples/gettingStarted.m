@@ -178,7 +178,7 @@ bfRestricted  =   bf.anova(data,'rt~freq +ori:freq + (1|subject)');
 % the difference with before is that now both BF have been calculated with
 % the subject random intercept.
 
-bfMain = bfFull/bfRestricted
+bfMain = bfFull./bfRestricted
 
 %% Regression
 % We analyze the attitude data set  (See

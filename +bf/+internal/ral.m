@@ -221,7 +221,7 @@ methods
         persistent warned
         if isempty(warned)
             warned =true;
-            fprintf(2,'Matrix multiplication for RAL not implemented yet...assuming you want to do .* instead of *');
+            fprintf(2,'Matrix multiplication for RAL not implemented yet...assuming you want to do .* instead of * (Further warnigns are disabled for this session)');
         end
         v = times(o,x);
     end
@@ -237,7 +237,7 @@ methods
         persistent warned
         if isempty(warned)
             warned =true;
-            fprintf(2,'Matrix division for RAL not implemented yet...assuming you want to do ./ instead of /');
+            fprintf(2,'Matrix division for RAL not implemented yet...assuming you want to do ./ instead of / (Further warnigns are disabled for this session)');
         end
         v = rdivide(o,x);
     end

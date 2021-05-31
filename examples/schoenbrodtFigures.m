@@ -9,7 +9,10 @@ function results = schoenbrodtFigures(nr,nrMC)
 % match perfectly; there is randomization in the effects, in the noise
 % added to the effects. Ballpark matches are all we can expect here and
 % that seems to be the case. A direct comparison of bayesfFactor.ttest with
-% the R package results does show an exact match.
+% the R package results does show an exact match. 
+%
+% Please also note that the definition of scale is not always the same
+% (e.g. what is 2 here, is sqrt(2) in JASP).
 %
 % BK  -Jan 2019
 
