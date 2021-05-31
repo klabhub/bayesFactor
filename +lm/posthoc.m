@@ -63,7 +63,17 @@ if isnumeric(A)
 else
     c  = lm.contrast(m,A,B); % the linear contrast
 end
-delta = c*m.fixedEffects;
+
+
+if isa(m,'LinearModel')
+    delta  =c*m.Coefficients.Estimate;
+elseif isa(m,'LinearMixedModel') || isa(m,'GeneralizedLinearMixedModel')
+    delta = c*m.fixedEffects;
+else
+    error('Unknown model type')
+end
+
+
 debugStr = strcat(m.CoefficientNames', ' : ' , cellstr(num2str(c')));
 predictedDelta = predictedDelta(:).*ones(size(delta));
 if ~all(size(delta)==size(predictedDelta))

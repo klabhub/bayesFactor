@@ -12,7 +12,7 @@ function [v,TA,TB] = contrast(m,A,B,defineDifference,scale)
 % scale -  Set this to true to scale the weights such that sum(abs(v)) ==2.
 % This puts the contrast score on the same scale as the original means
 % (Kirk, 1995). [false]
-% 
+%
 % OUTPUT
 % v = The contrast correspoonding to A-B
 %
@@ -25,87 +25,101 @@ if nargin<5
 end
 
 import lm.*
-if isa(A,'table')
-    % Use the conditions specified in the table.
-    TA =A;
-    defaultA = {};
+if isa(A,'double') && isa(B,'double')
+    %
+    % Both lready specfied as numeric contrasts
+    v= A-B;
+    TA= table;
+    TB =table;
 else
-    %% Create tables that define the conditions specified by A and (if requested ) B.
-    varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
-    varNames = m.VariableNames(m.VariableInfo.InModel);
-    defaultValues = m.Variables(1,m.VariableInfo.InModel);% First row in the data is the default
-    TA= defaultValues;
-    defaultA = setdiff(varNames,A(1:2:end))';
-    TA = fillTable(varTypes,varNames,TA,A); % Replace default with values specified in A
-end
-
-% Same for condition B
-if nargin >2 && ~isempty(B)
-    if isa(B,'table')
-        TB = B;
-        defaultB = {};
+    if isa(A,'table')
+        % Use the conditions specified in the table.
+        TA =A;
+        defaultA = {};
     else
-        if defineDifference
-            TB = TA;  % Start with TA, replace what is in B
-            defaultB = setdiff(varNames,cat(2,A(1:2:end),B(1:2:end)))';
-            for i=1:2:numel(B)
-                thisType = varTypes{strcmpi(B{i},varNames)};
-                TB.(B{i}) = convert(B{i+1},thisType);
-            end
+        %% Create tables that define the conditions specified by A and (if requested ) B.
+        varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
+        varNames = m.VariableNames(m.VariableInfo.InModel);
+        defaultValues = m.Variables(1,m.VariableInfo.InModel);% First row in the data is the default
+        TA= defaultValues;
+        defaultA = setdiff(varNames,A(1:2:end))';
+        TA = fillTable(varTypes,varNames,TA,A); % Replace default with values specified in A
+    end
+    
+    % Same for condition B
+    if nargin >2 && ~isempty(B)
+        if isa(B,'table')
+            TB = B;
+            defaultB = {};
         else
-            TB=defaultValues; % Start with default, then replace what is in B.
-            defaultB = setdiff(varNames,B(1:2:end))';
-            TB = fillTable(varTypes,varNames,TB,B);
+            if defineDifference
+                TB = TA;  % Start with TA, replace what is in B
+                defaultB = setdiff(varNames,cat(2,A(1:2:end),B(1:2:end)))';
+                for i=1:2:numel(B)
+                    thisType = varTypes{strcmpi(B{i},varNames)};
+                    TB.(B{i}) = convert(B{i+1},thisType);
+                end
+            else
+                TB=defaultValues; % Start with default, then replace what is in B.
+                defaultB = setdiff(varNames,B(1:2:end))';
+                TB = fillTable(varTypes,varNames,TB,B);
+            end
         end
     end
-end
-%% With these tables we can use the builtin functions to create a "designmatrix" for A and B
-[~,varLocs] = ismember(TA.Properties.VariableNames,m.VariableNames);
-
-terms = m.Formula.FELinearFormula.Terms(:,varLocs);
-aTerms = terms;
-dvCoding = lm.dummyVarCoding(m);
-[vA,terms,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TA,'Model',aTerms, ...
-    'DummyVarCoding', dvCoding, ...
-    'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
-    'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-if any(ismissing(vA))
-    error('The A condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
-end
-% Remove the terms that depend on the (arbitrary) default valuse
-for i=1:numel(defaultA)
-    defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultA{i})));
-    if ~isempty(defaultTerms)
-        out = ismember(cols2terms,defaultTerms);
-        vA(out) = 0;
+    %% With these tables we can use the builtin functions to create a "designmatrix" for A and B
+    [~,varLocs] = ismember(TA.Properties.VariableNames,m.VariableNames);
+    if isa(m,'LinearModel')
+        terms = m.Formula.Terms(:,varLocs);
+    elseif isa(m,'LinearMixedModel') || isa(m,'GeneralizedLinearMixedModel')
+        terms = m.Formula.FELinearFormula.Terms(:,varLocs);
+    else
+        error('Unknown model type')
     end
-end
-
-%% Same for B if requested.
-if nargin <3 || isempty(B)
-    vB = zeros(size(vA));
-    vB(1) = 1; % Intercept only
-else
-    bTerms = terms;
-    [vB,~,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TB,'Model',bTerms, ...
+    aTerms = terms;
+    dvCoding = lm.dummyVarCoding(m);
+    [vA,terms,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TA,'Model',aTerms, ...
         'DummyVarCoding', dvCoding, ...
         'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
         'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-    if any(ismissing(vB))
-        error('The B condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+    if any(ismissing(vA))
+        error('The A condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
     end
-    for i=1:numel(defaultB)
-        defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultB{i})));
+    % Remove the terms that depend on the (arbitrary) default valuse
+    for i=1:numel(defaultA)
+        defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultA{i})));
         if ~isempty(defaultTerms)
             out = ismember(cols2terms,defaultTerms);
-            vB(out) = 0;
+            vA(out) = 0;
         end
     end
+    
+    %% Same for B if requested.
+    if nargin <3 || isempty(B)
+        vB = zeros(size(vA));
+        vB(1) = 1; % Intercept only
+    else
+        bTerms = terms;
+        [vB,~,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TB,'Model',bTerms, ...
+            'DummyVarCoding', dvCoding, ...
+            'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
+            'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
+        if any(ismissing(vB))
+            error('The B condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+        end
+        for i=1:numel(defaultB)
+            defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultB{i})));
+            if ~isempty(defaultTerms)
+                out = ismember(cols2terms,defaultTerms);
+                vB(out) = 0;
+            end
+        end
+    end
+    
+    % The contrast is the difference between the two vectors
+    % This removes the influence of the default values.
+    v =vA-vB;
 end
 
-% The contrast is the difference between the two vectors
-% This removes the influence of the default values.
-v =vA-vB;
 if scale
     v = v ./(0.5*sum(abs(v)));
 end
