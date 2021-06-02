@@ -26,7 +26,12 @@ if nargin<5
 end
 
 import lm.*
-if isa(A,'table')
+if isa(A,'double') && isa(B,'double')
+    % Both lready specfied as numeric contrasts
+    v= A-B;
+    TA= table;
+    TB =table;
+elseif isa(A,'table')
     % Use the conditions specified in the table.
     TA =A;    
 else
@@ -35,7 +40,7 @@ else
 end
 
 % Same for condition B
-if nargin >2 && ~isempty(B)
+if nargin >2 && ~isempty(B) && ~isa(B,'double')
     if isa(B,'table')
         TB = B;        
     else

@@ -1,5 +1,5 @@
 function [p,T,df,delta,ci,str] = tost(m,A,B,bounds,alpha)
-% Post-hoc equivalence test for two conditions in a linear model.
+% Post-hoc equivalence/superiority/inferiority test for two conditions in a linear model.
 % This is based on the two-one sided tests (TOST) approach. 
 % See Schuirmann 1987,Lakens 2017 for a tutorial treatment.
 %
@@ -31,7 +31,7 @@ function [p,T,df,delta,ci,str] = tost(m,A,B,bounds,alpha)
 % bounds= Bounds for the smallest effect size of interest (SESOI). For
 % superiority/inferiority equivalence tests, one of the bounds can be inf
 % or -inf.
-% alpha -  Significance level.
+% alpha -  Significance level. [0.05]
 %
 % OUTPUT
 % p,T,df associated with the test with highest p-value
@@ -53,6 +53,7 @@ function [p,T,df,delta,ci,str] = tost(m,A,B,bounds,alpha)
 % (i.e. not reject the null hypothesis that the true differences lie outside the
 % [-1 1] interval).
 %
+% 
 % BK - Feb 2021
 
 
@@ -60,14 +61,15 @@ function [p,T,df,delta,ci,str] = tost(m,A,B,bounds,alpha)
 % BK - Feb 2021
 if nargin <5
     alpha = 0.05;
+    
 end
-if numel(bounds) ~=2
-    error('TOST requires both an upper and a lower equivalence bound.');
-end
+
+
 % Is A-B surprisingly larger than the lower bound
 [pLB,tLB,df,delta,ciLB,strLB] = lm.posthoc(m,A,B,min(bounds),'right',alpha);
 % Or surprisingly smaller than the upper bound
 [pUB,tUB,~,~,ciUB,strUB] = lm.posthoc(m,A,B,max(bounds),'left',alpha);
+
 % Keep the least significant of the two one-sided tests.
 if pUB < pLB
     p = pLB;
@@ -78,7 +80,7 @@ else
     p =pUB;
     T =tUB;
     ci = ciUB;
-    str= strLB;
+    str= strUB;
 end
 
 
@@ -87,13 +89,14 @@ if false
     %% Test the code with the example in Lakens 2017, page 357
     %  Results are similar (this uses randn so it cannot be a 
     % perfect match). Lakens has t(182) = 2.69, p = .004
+    
     nControl = 95;
     nOrganic = 89;
     control = 5.25 + 0.95*randn(nControl,1);
     organic = 5.22 + 0.83*randn(nOrganic,1);
     T= table([control;organic],[repmat("control",[nControl 1]);repmat("organic",[nOrganic 1])],'variablenames',{'judgment','food'});
     % Fit an LM
-    m = fitlme(T,'judgment~food','DummyVarCoding','effects');
+    m = fitlm(T,'judgment~food','DummyVarCoding','effects');
     bound = 0.384;
     dfManual = nControl +nOrganic -2;
     pooledSigma = sqrt(((nControl-1)*var(control) + (nOrganic-1)*var(organic))/dfManual);
@@ -109,8 +112,8 @@ if false
         pManual = pL;
         statManual = tL;
     end
-    % Now compare the manual results with the klm code.
+    % Now compare the manual results with the klm code (these match exactly).
     [pKlm,statKlm,dfKlm,delta,ci,str] = lm.tost(m,{'food','organic'},{'food','control'},bound*[-1 1]);
     
-    fprintf('\n Manual : t(%d)= %3.3f, p= %3.3f,  \n LM Package: %s\n',dfManual,statManual,pManual,str)
+    fprintf('Lakens t(182) = 2.69, p = .004 \n Manual : t(%d)= %3.3f, p= %3.3f,  \n LM Package: %s\n',dfManual,statManual,pManual,str)
 end

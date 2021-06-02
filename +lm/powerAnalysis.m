@@ -20,11 +20,14 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 % contrast  - Matrix with specific model contrasts (see lm.posthoc or coefTest how to specify contrasts)
 % equivalence - Cell array where each row defines an equivalence test
 %               {A,B,bounds}; see lm.tost
+%               By specifying {A,B,bounds,tail}  with tail 'left' or
+%               'right' the equivalence test becomes an inferiority or
+%               superiority test.
 % nrWorkers = The number of workers for parfor [0]
 % graph - set to true to show the results in graphical form [false]
 % names - Name each of the model terms (anova terms, contrasts,
 % equivalences, in that order) - used only by the legend of the graph.
-% 
+%
 % OUTPUT
 % Each row corresponds to a number of simulated subjects, each column to a
 % term/contrast/equivalence test.
@@ -46,7 +49,9 @@ p.addParameter('anovaTerm',m.anova.Term,@iscell);
 p.addParameter('contrast',{},@iscell);
 p.addParameter('equivalence',{},@iscell);
 p.addParameter('nrWorkers',0,@isnumeric); % By default no parfor
+p.addParameter('sesoi',[],@isnumeric);
 p.addParameter('fixedEffectsScale',[],@isnumeric);
+p.addParameter('randomEffectsScale',[],@isnumeric);
 p.addParameter('qcFunction',@(x)(x),@(x)isa(x,'function_handle')); % Apply QC to each simulated set.
 p.addParameter('graph',false,@islogical);
 p.addParameter('names',{},@iscell);
@@ -79,19 +84,36 @@ contrastPValue= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 deltaContrast = nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 equivalencePValue = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
 qcFunction  =p.Results.qcFunction;
-if isempty(p.Results.fixedEffectsScale)
-    fixedEffectsScale = [];
-elseif numel(p.Results.fixedEffectsScale)==numel(m.fixedEffects)
-    % Same scaling for each observatin
-    fixedEffectsScale  = repmat(p.Results.fixedEffectsScale,[m.NumObservations 1]);
-elseif all(size(p.Results.fixedEffectsScale)==[m.NumObservations numel(m.fixedEffects)])
-    % Each observation with its own scale
-    fixedEffectsScale  =p.Results.fixedEffectsScale;
+nrRandomEffects = numel(m.randomEffects);
+if ~isempty(p.Results.sesoi)
+    % Use the sesoi to scale fixed effects (only)
+    assert(size(contrast,1)==1 && numel(p.Results.sesoi) ==1,'Sesoi can only be computed for a single contrast at a time.');
+    assert(isempty(p.Results.fixedEffectsScale) && isempty(p.Results.randomEffectsScale),'Choose either sesoiScale or fixed/random effects scale, but not both');
+    fe = m.fixedEffects;    
+    con = lm.contrast(m,contrast{1,1:2});
+    modelContrast = con*fe;
+    scale  =p.Results.sesoi./modelContrast;
+    fixedEffectsScale  =ones(size(con));
+    changeFe = con~=0;
+    fixedEffectsScale(changeFe) = scale.*con(changeFe);
+    fixedEffectsScale  = repmat(fixedEffectsScale,[m.NumObservations 1]);
+    randomEffectsScale =  ones(m.NumObservations ,nrRandomEffects);
 else
-    error(['The size of the fixed effect scaling [' num2str(size(p.Results.fixedEffectsScale)) '] does not match the data [' num2str([m.NumObservations numel(m.fixedEffects)]) ']'])
+    % Setup scaling for fixed and random effects based on the user supplied
+    % fixed/random effects scale
+    fixedEffectsScale = p.Results.fixedEffectsScale;
+    if isempty(fixedEffectsScale)
+        fixedEffectsScale = ones(1,m.NumCoefficients);
+    end
+    assert(size(fixedEffectsScale,2) == m.NumCoefficients,'The numbers of elements in fixedEffectsScale should match the number of fixed effects coefficients in the model');
+    fixedEffectsScale  = repmat(fixedEffectsScale,[m.NumObservations 1]);
+    randomEffectsScale = p.Results.randomEffectsScale;    
+    if isempty(randomEffectsScale)
+        randomEffectsScale = ones(1,nrRandomEffects);
+    end
+    assert( size(randomEffectsScale,2) == nrRandomEffects,'The numbers of elements in randomEffectsScale should match the number of random effects coefficients in the model');
+    randomEffectsScale  = repmat(randomEffectsScale,[m.NumObservations 1]);
 end
-
-
 % Use a dataqueue to show progress updates
 dataQueue = parallel.pool.DataQueue;
 hWaithBar = waitbar(0,['Power analysis for ' m.Formula.char ]);
@@ -104,18 +126,32 @@ nrTotal = nrN*nrMonteCarlo;
 afterEach(dataQueue,@updateWaitBar);
 
 
-if ~isempty(fixedEffectsScale)
-    % Hack to get access to the private slme member of m
-    st= warning('query');
-    warning('off', 'MATLAB:structOnObject'); % Avoid the warning
-    modelStruct = struct(m);
-    warning(st);
+% Hack to get access to the private slme member of m
+st= warning('query');
+warning('off', 'MATLAB:structOnObject'); % Avoid the warning
+modelStruct = struct(m);
+slme = modelStruct.slme;
+warning(st);
+
+%Modify the design matrix with the fixed effect scaling  (defaults to no
+%change with fixedEffectsScale /randomEffectsScale empty
+X = slme.X .* fixedEffectsScale; % Fixed effects
+subset       = modelStruct.ObservationInfo.Subset;
+Z = slme.Z.*randomEffectsScale; % Random effects
+if isa(m,'LinearMixedModel')
+    weights = modelStruct.ObservationInfo.Weights;
+    weights = weights(subset);
+elseif isa(m,'GeneralizedLinearMixedModel')
+    weights     = slme.PriorWeights;
+    offset    = slme.Offset;
+    ntrials = slme.BinomialSize;
 else
-    modelStruct = []; %Not used 
+    error('Unknown model type??');
 end
 
+
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
-%for i=1:nrMonteCarlo  % For debugggin without parfor
+%      for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN
         
         % Generate surrogate data based on the model
@@ -127,36 +163,20 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
         for s = 1:nrSims
             % For each s we generates the same number of responses as in the original data.
             % The builtin random function generates random effects as well
-            % as error on each call. So these are "new" subjects. In the
-            % manual calculation we do the same (while allowing some
-            % scaling of fixed effects)
-            if isempty(fixedEffectsScale)
-                simResponse = random(m); % Use built-in - it handles all random effecs, including multiple grouping.
-            else
-                % We are scaling fixed effects
-                %Modify the design matrix with the fixed effect scaling
-                X = modelStruct.slme.X .* fixedEffectsScale; %#ok<PFBNS>
-                subset       = modelStruct.ObservationInfo.Subset;
-                % Then use code copied from
-                % (Generalized)LinearMixedModel/random
-                % To call random on the slme
-                if isa(m,'LinearMixedModel')
-                    ysim = random(modelStruct.slme,[],X,modelStruct.slme.Z);
-                    w = modelStruct.ObservationInfo.Weights;
-                    w = w(subset);
-                    ysim = ysim ./ sqrt(w);
-                elseif isa(m,'GeneralizedLinearMixedModel')
-                    wp      = modelStruct.slme.PriorWeights;
-                    delta   = modelStruct.slme.Offset;
-                    ntrials = modelStruct.slme.BinomialSize;
-                    ysim    = random(modelStruct.slme,[],X,modelStruct.slme.Z,delta,wp,ntrials);
-                else
-                    ysim =[]; %#ok<NASGU> % Make the parfor parser happy.
-                    error('Unknown model??');
-                end
-                simResponse= NaN(length(subset),1);
-                simResponse(subset) = ysim;
+            % as error on each call. So these are "new" subjects.
+            
+            % Use code copied from
+            % (Generalized)LinearMixedModel/random
+            % To call random on the slme
+            if isa(m,'LinearMixedModel')
+                ysim = random(slme,[],X,Z);
+                ysim = ysim ./ sqrt(weights);
+            elseif isa(m,'GeneralizedLinearMixedModel')
+                ysim    = random(slme,[],X,Z,offset,weights,ntrials);
             end
+            simResponse= NaN(length(subset),1);
+            simResponse(subset) = ysim;
+            
             % Use what we need, while making sure to sample a complete "data set" for each subject.
             if s==nrSims
                 nrSubjectsNow = nrSubjectsToSimulate(n)- nrSubjectsSoFar;
@@ -173,7 +193,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
                 % Assign a new ID to each subject
                 thisSim.(subjectVariable) = repmat(categorical(subjectNr),[sum(keep) 1]);
                 subjectNr = subjectNr +1;
-                simT = [simT; thisSim]; 
+                simT = [simT; thisSim];
             end
         end
         if ~isempty(qcFunction)
@@ -236,11 +256,19 @@ h=[];
 %% Show graphical results
 if p.Results.graph
     %Interpolate subjects for the graph
-    iSubjects= (min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate))';
+    if nrN>1
+        iSubjects= (min(nrSubjectsToSimulate):1:max(nrSubjectsToSimulate))';
+    else
+        iSubjects = nrSubjectsToSimulate;
+    end
     powerValues = {anovaPower,contrastPower,equivalencePower};
     for i=1:3
         if ~isempty(powerValues{i})
-            iPower = interp1(nrSubjectsToSimulate,powerValues{i},iSubjects,'pchip');
+            if nrN>1
+                iPower = interp1(nrSubjectsToSimulate,powerValues{i},iSubjects,'pchip');
+            else
+                iPower = powerValues{i};
+            end
             
             % Binomial confidence intervals
             [x,ci] = binofit(round(powerValues{i}(:)*nrMonteCarlo),nrMonteCarlo);
