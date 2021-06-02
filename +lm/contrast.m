@@ -6,7 +6,8 @@ function [v,TA,TB] = contrast(m,A,B,defineDifference,scale)
 % m - The linear model
 % A - Condition A - A cell array of variable/value pairs.
 % B - Condition B - B cell array of variable/value pairs.Can be empty, in
-%       which case the function returns the vector defining A.
+%       which case the function returns the vector defining A relative to
+%       the intercept only model
 % defineDifference = When set tot true, the B cell array specifies only those
 %           variables that are different in B. [true]
 % scale -  Set this to true to scale the weights such that sum(abs(v)) ==2.
@@ -26,117 +27,96 @@ end
 
 import lm.*
 if isa(A,'double') && isa(B,'double')
-    %
     % Both lready specfied as numeric contrasts
     v= A-B;
     TA= table;
     TB =table;
+elseif isa(A,'table')
+    % Use the conditions specified in the table.
+    TA =A;    
 else
-    if isa(A,'table')
-        % Use the conditions specified in the table.
-        TA =A;
-        defaultA = {};
+    %% Create tables that define the conditions specified by A
+    TA = fillTable(m,A);    
+end
+
+% Same for condition B
+if nargin >2 && ~isempty(B) && ~isa(B,'double')
+    if isa(B,'table')
+        TB = B;        
     else
-        %% Create tables that define the conditions specified by A and (if requested ) B.
-        varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
-        varNames = m.VariableNames(m.VariableInfo.InModel);
-        defaultValues = m.Variables(1,m.VariableInfo.InModel);% First row in the data is the default
-        TA= defaultValues;
-        defaultA = setdiff(varNames,A(1:2:end))';
-        TA = fillTable(varTypes,varNames,TA,A); % Replace default with values specified in A
-    end
-    
-    % Same for condition B
-    if nargin >2 && ~isempty(B)
-        if isa(B,'table')
-            TB = B;
-            defaultB = {};
-        else
-            if defineDifference
-                TB = TA;  % Start with TA, replace what is in B
-                defaultB = setdiff(varNames,cat(2,A(1:2:end),B(1:2:end)))';
-                for i=1:2:numel(B)
-                    thisType = varTypes{strcmpi(B{i},varNames)};
-                    TB.(B{i}) = convert(B{i+1},thisType);
-                end
-            else
-                TB=defaultValues; % Start with default, then replace what is in B.
-                defaultB = setdiff(varNames,B(1:2:end))';
-                TB = fillTable(varTypes,varNames,TB,B);
+        if defineDifference
+            TB = TA;  % Start with TA, replace what is in B
+            varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
+            varNames = m.VariableNames(m.VariableInfo.InModel);  
+            defaultB = setdiff(varNames,cat(2,A(1:2:end),B(1:2:end)))';
+            for i=1:2:numel(B)
+                thisType = varTypes{strcmpi(B{i},varNames)};
+                TB.(B{i}) = convert(B{i+1},thisType);
             end
+        else
+             TB = fillTable(m,B);                 
         end
     end
-    %% With these tables we can use the builtin functions to create a "designmatrix" for A and B
-    [~,varLocs] = ismember(TA.Properties.VariableNames,m.VariableNames);
-    if isa(m,'LinearModel')
-        terms = m.Formula.Terms(:,varLocs);
-    elseif isa(m,'LinearMixedModel') || isa(m,'GeneralizedLinearMixedModel')
-        terms = m.Formula.FELinearFormula.Terms(:,varLocs);
-    else
-        error('Unknown model type')
-    end
-    aTerms = terms;
-    dvCoding = lm.dummyVarCoding(m);
-    [vA,terms,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TA,'Model',aTerms, ...
+end
+%% With these tables we can use the builtin functions to create a "designmatrix" for A and B
+[~,varLocs] = ismember(TA.Properties.VariableNames,m.VariableNames);
+
+terms = m.Formula.FELinearFormula.Terms(:,varLocs);
+aTerms = terms;
+dvCoding = lm.dummyVarCoding(m);
+[vA,terms,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TA,'Model',aTerms, ...
+    'DummyVarCoding', dvCoding, ...
+    'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
+    'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
+if any(ismissing(vA))
+    error('The A condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+end
+
+
+%% Same for B if requested.
+if nargin <3 || isempty(B)
+    vB = zeros(size(vA));
+    vB(1) = 1; % Intercept only
+else
+    bTerms = terms;
+    [vB,~,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TB,'Model',bTerms, ...
         'DummyVarCoding', dvCoding, ...
         'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
         'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-    if any(ismissing(vA))
-        error('The A condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
-    end
-    % Remove the terms that depend on the (arbitrary) default valuse
-    for i=1:numel(defaultA)
-        defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultA{i})));
-        if ~isempty(defaultTerms)
-            out = ismember(cols2terms,defaultTerms);
-            vA(out) = 0;
-        end
-    end
-    
-    %% Same for B if requested.
-    if nargin <3 || isempty(B)
-        vB = zeros(size(vA));
-        vB(1) = 1; % Intercept only
-    else
-        bTerms = terms;
-        [vB,~,cols2vars,cols2terms,colNames,termNames]  = classreg.regr.modelutils.designmatrix(TB,'Model',bTerms, ...
-            'DummyVarCoding', dvCoding, ...
-            'CategoricalVars',m.VariableInfo.IsCategorical(varLocs), ...
-            'CategoricalLevels',m.VariableInfo.Range(varLocs)); %#ok<ASGLU>
-        if any(ismissing(vB))
-            error('The B condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
-        end
-        for i=1:numel(defaultB)
-            defaultTerms = find(~cellfun(@isempty,regexp(termNames,defaultB{i})));
-            if ~isempty(defaultTerms)
-                out = ismember(cols2terms,defaultTerms);
-                vB(out) = 0;
-            end
-        end
-    end
-    
-    % The contrast is the difference between the two vectors
-    % This removes the influence of the default values.
-    v =vA-vB;
+    if any(ismissing(vB))
+        error('The B condition contains missing values, suggesting you specified levels that do not exist? (Case sensitive categoricals?)');
+    end   
 end
 
+% The contrast is the difference between the two vectors
+% This removes the influence of the default values.
+v =vA-vB;
 if scale
     v = v ./(0.5*sum(abs(v)));
 end
 end
 
-function TX= fillTable(varTypes,varNames,TX,X)
-for i = 1:numel(varNames)
-    ix= find(ismember(X(1:2:end),varNames{i}));
-    if numel(ix)==1
-        thisVal = convert(X{2*(ix-1)+2},varTypes{i});
-        TX.(varNames{i}) = thisVal;
-    elseif numel(ix)==0
-        %nothing to do (probably a random effect)
-    else
-        error('?');
+function TX= fillTable(m,X)
+    varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
+    varNames = m.VariableNames(m.VariableInfo.InModel);
+    varRange =m.VariableInfo.Range(m.VariableInfo.InModel);
+    nrVars= numel(varTypes);
+    TX = table('Size',[1 nrVars],'VariableType',varTypes,'VariableNames',varNames);
+    for i=1:nrVars
+        [tf,ix] =ismember(varNames{i},X(1:2:end));
+        if tf
+            value = X{2*ix};
+        else
+            switch (varTypes{i})
+                case 'categorical'
+                    value = varRange{i}(1); % First in range is the default
+                otherwise
+                    error('Non categorical variables... not sure what to do here...');
+            end
+        end
+        TX.(varNames{i}) =value;
     end
-end
+    
 end
 
 function val = convert(val,type)
