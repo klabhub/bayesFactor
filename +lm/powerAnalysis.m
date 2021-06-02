@@ -15,19 +15,23 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 % table. If specified, this function is applied to each simulated data set
 % to ensure the same quality control as for the real experiment.
 %
+% fixedEffectsScale = Row vector (matching the size of fixedEffects) setting the factor with which each fixed
+% effect is multiplied (e..g by 0 to simulate a null hypothesis).  Defaults
+% to 1  (i.e. no scaling)
+% randomEffectsScale = Row vector to scale random effects. Defaults to 1
+% (no scaling)
+% multipleComparisonsProcedure = 'None','FDR','Bonferroni'  - applied only to the
+%                                                           (multiple) contrasts and equivalences
 % Power Analysis will be done for the following model terms:
 % anovaTerm - Cell array with anova terms
 % contrast  - Matrix with specific model contrasts (see lm.posthoc or coefTest how to specify contrasts)
 % equivalence - Cell array where each row defines an equivalence test
 %               {A,B,bounds}; see lm.tost
-%               By specifying {A,B,bounds,tail}  with tail 'left' or
-%               'right' the equivalence test becomes an inferiority or
-%               superiority test.
 % nrWorkers = The number of workers for parfor [0]
 % graph - set to true to show the results in graphical form [false]
 % names - Name each of the model terms (anova terms, contrasts,
 % equivalences, in that order) - used only by the legend of the graph.
-%
+% 
 % OUTPUT
 % Each row corresponds to a number of simulated subjects, each column to a
 % term/contrast/equivalence test.
@@ -55,6 +59,7 @@ p.addParameter('randomEffectsScale',[],@isnumeric);
 p.addParameter('qcFunction',@(x)(x),@(x)isa(x,'function_handle')); % Apply QC to each simulated set.
 p.addParameter('graph',false,@islogical);
 p.addParameter('names',{},@iscell);
+p.addParameter('multipleComparisonsProcedure','none',@(x)(ischar(x) && ismember(upper(x),{'FDR','BONFERRONI','NONE'})));
 p.parse(m,varargin{:});
 
 if any(m.ObservationInfo.Excluded)
@@ -63,6 +68,7 @@ end
 
 dummyVarCoding = lm.dummyVarCoding(m);
 % Extract from p to avoid broadcasting and initialize outputs
+alpha = p.Results.alpha;
 nrSubjectsToSimulate= p.Results.nrSubjects(:)';
 nrWorkers = p.Results.nrWorkers;
 nrMonteCarlo = p.Results.nrMonteCarlo;
@@ -72,6 +78,7 @@ equivalence  =  p.Results.equivalence;
 nrEquivalenceTests= size(equivalence,1);
 nrEquivalenceTestsHack = max(1,nrEquivalenceTests);
 anovaTerm = p.Results.anovaTerm;
+mcp = p.Results.multipleComparisonsProcedure;
 nrAnovaTerms = size(anovaTerm ,1);
 nrAnovaTermsHack = max(nrAnovaTerms,1);
 uSubjectID = unique(m.Variables.(subjectVariable));
@@ -79,10 +86,10 @@ nrSubjectsAvailable  = numel(uSubjectID);
 nrN = numel(nrSubjectsToSimulate);
 nrContrasts = size(contrast,1);
 nrContrastsHack = max(nrContrasts,1);
-anovaPValue= nan(nrAnovaTerms,nrN,p.Results.nrMonteCarlo);
-contrastPValue= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
+anovaIsSig= nan(nrAnovaTerms,nrN,p.Results.nrMonteCarlo);
+contrastIsSig= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 deltaContrast = nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
-equivalencePValue = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
+equivalenceIsSig = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
 qcFunction  =p.Results.qcFunction;
 nrRandomEffects = numel(m.randomEffects);
 if ~isempty(p.Results.sesoi)
@@ -149,9 +156,10 @@ else
     error('Unknown model type??');
 end
 
+mcpfun = @multicomp; % Hack to use the nested function in the parfor using feval
 
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
-%      for i=1:nrMonteCarlo  % For debugggin without parfor
+  %    for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN
         
         % Generate surrogate data based on the model
@@ -173,6 +181,8 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
                 ysim = ysim ./ sqrt(weights);
             elseif isa(m,'GeneralizedLinearMixedModel')
                 ysim    = random(slme,[],X,Z,offset,weights,ntrials);
+            else 
+                error('Unknown model type');
             end
             simResponse= NaN(length(subset),1);
             simResponse(subset) = ysim;
@@ -215,29 +225,32 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
             else
                 thisAnova = anova(lmSim);
                 stay = strcmp(anovaTerm{a,:},thisAnova.Term); %#ok<PFBNS>
-                anovaPValue(a,n,i) = thisAnova.pValue(stay);
+                anovaIsSig(a,n,i) = thisAnova.pValue(stay)<alpha;
             end
         end
         
         
         % Evaluate specific contrasts, if requested
+        thisContrastP =nan(nrContrasts,1);
         for c = 1:nrContrastsHack
             if nrContrastsHack >nrContrasts
                 break;
-            else
-                [contrastPValue(c,n,i),~,~,deltaContrast(c,n,i)] = lm.posthoc(lmSim,contrast{c,:}); %#ok<PFBNS>
+            else                
+                [thisContrastP(c),~,~,deltaContrast(c,n,i)] = lm.posthoc(lmSim,contrast{c,:}); %#ok<PFBNS>
             end
         end
-        
+        contrastIsSig(:,n,i) = feval(mcpfun,thisContrastP,alpha,mcp); %#ok<FVAL>
         
         % Evaluate equiavlence tests, if requested
+        thisEqP =nan(nrEquivalenceTests,1);
         for e = 1:nrEquivalenceTestsHack
             if nrEquivalenceTestsHack >nrEquivalenceTests
                 break;
             else
-                equivalencePValue(e,n,i) = lm.tost(lmSim,equivalence{e,:}); %#ok<PFBNS>
+                thisEqP(e) = lm.tost(lmSim,equivalence{e,:}); %#ok<PFBNS>                
             end
-        end
+        end        
+        equivalenceIsSig(:,n,i) = feval(mcpfun,thisEqP,alpha,mcp); %#ok<FVAL>
         
         % Update the data queue
         send(dataQueue,(n-1)+i);
@@ -246,9 +259,9 @@ end
 
 close(hWaithBar);
 
-anovaPower = nanmean(anovaPValue<p.Results.alpha,3)';
-contrastPower = nanmean(contrastPValue<p.Results.alpha,3)';
-equivalencePower = nanmean(equivalencePValue<p.Results.alpha,3)';
+anovaPower = nanmean(anovaIsSig,3)';
+contrastPower = nanmean(contrastIsSig,3)';
+equivalencePower = nanmean(equivalenceIsSig,3)';
 
 
 h=[];
@@ -290,4 +303,25 @@ if p.Results.graph
     end
     drawnow;
 end
+
+
+function isSig = multicomp(p,alpha,mcp)
+% Multiple comparison procedure
+nrComps = numel(p);
+switch (upper(mcp))
+    case 'NONE'
+        isSig = p<alpha;
+    case 'BONFERRONI'
+        isSig = p<alpha./nrComps;
+    case 'FDR'
+        %Benjamini - Hochberg FDR.
+        [sortedP,ix] = sort(p,'ascend');
+        isSig = sortedP< (1:nrComps)*alpha/nrComps;
+        [~,ix ] =sort(ix,'ascend');
+        isSig = isSig(ix);
+    otherwise
+        error('Unknown MCP %s',mcp);
 end
+end
+end
+
