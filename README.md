@@ -1,6 +1,6 @@
 # Bayes Factor
-A Matlab package for Bayes Factor statistical analysis plus some tools 
-to simplify working with (generalized) linear mixed models in Matlab.
+A Matlab package for Bayes Factor statistical analysis (+bf) plus some tools 
+to simplify working with (generalized) linear mixed models in Matlab (+lm).
 
 Source coude is available at:
 https://github.com/klabhub/bayesFactor
