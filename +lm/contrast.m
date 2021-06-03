@@ -31,6 +31,7 @@ if isa(A,'double') && isa(B,'double')
     v= A-B;
     TA= table;
     TB =table;
+    return;
 elseif isa(A,'table')
     % Use the conditions specified in the table.
     TA =A;    
@@ -40,7 +41,7 @@ else
 end
 
 % Same for condition B
-if nargin >2 && ~isempty(B) && ~isa(B,'double')
+if nargin >2 && ~isempty(B) 
     if isa(B,'table')
         TB = B;        
     else
