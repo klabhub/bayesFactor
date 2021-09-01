@@ -46,9 +46,26 @@ for f=1:numel(factors)
         style =1; % stdout; 
     end
     if showEffects
-        fmt = cat(2, fmt ,[' (Effect: %3.3g  CI [%4.4g, %4.4g])']);
         fe = m.fixedEffects;
-        vars = cat(2,vars,{fe(stay),m.Coefficients.Lower(stay),m.Coefficients.Upper(stay)});
+        if ~contains(factor,':')            
+            % Find the corresponding linear effect (or the largest one for
+            % a multilevel categorical factor).
+            stayFe = strncmpi(factor,m.CoefficientNames,numel(factor))& ~contains(m.CoefficientNames,':');
+            fe = fe(stayFe);
+            [fe,ix] = max(fe);
+            low = m.Coefficients.Lower(stayFe);
+            low = low(ix);
+            up =m.Coefficients.Upper(stayFe);
+            up = up(ix);
+            vars = cat(2,vars,{fe,low,up});
+            if sum(stayFe)>1
+                fmt = cat(2, fmt ,[' (Max Effect: %3.3g  CI [%4.4g, %4.4g])']);                    
+            else
+                fmt = cat(2, fmt ,[' (Effect: %3.3g  CI [%4.4g, %4.4g])']);                    
+            end
+        else
+            % Interaciton term... to do            
+        end
     end
     fprintf(style,[fmt '\n'],vars{:});    
 end

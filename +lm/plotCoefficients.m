@@ -22,7 +22,7 @@ if isempty(fe)
     allFe = m.CoefficientNames;%regexprep(lm.CoefficientNames,'_(?<level>[\w\d]+)\>','');
     out  = strcmpi(allFe,'(Intercept)');
     allFe(out) =[];
-    [estimate,lower,upper] = m.plotCoefficients(m,allFe,1:numel(allFe));
+    [estimate,lower,upper] = lm.plotCoefficients(m,allFe,1:numel(allFe)); % recurse
     return
 end
 
@@ -59,6 +59,6 @@ hold on
 errorbar(x,estimate,estimate-lower,upper-estimate,'.','CapSize',0,'Color','k');
 feNames =fe;% regexprep(fe,'_(?<level>[\w\d]+)\>','');
 ylabel(m.ResponseName)
-set(gca,'XTick',x,'XTickLabel',feNames);
+set(gca,'XTick',x,'XTickLabel',strrep(feNames,'_','-'),'XtickLabelRotation',45);
 
 end
