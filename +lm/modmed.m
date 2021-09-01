@@ -1,5 +1,6 @@
 function [results] = modmed(T,varargin)
 % [results] = modmed(T,varargin)
+% 
 % Moderated Mediation and Mediated Moderation, following the definitions in
 % Muller D, Judd CM, Yzerbyt VY (2005) When moderation is mediated and mediation is moderated. J Pers Soc Psychol 89:852–863.
 % and the recommended definition of effect size in 
@@ -9,11 +10,11 @@ function [results] = modmed(T,varargin)
 % Linear models are fit using fitlme's standard options (MLE). 
 %
 % If a moderator is included, paths are evaluated at +/- 1 stdev of the
-% moderator, or at the first and last categorical value of the
-% moderator.
+% (continuous) moderator, or at the first and last categorical value of the
+% categorical moderator.
 %
 % For models including random effects, the effect size kappa2 is computed
-% after removing the random effects.
+% after removing the fitted random effects.
 % 
 % SEE ALSO lm.plotModMed for a graphical representation of the results.
 %
@@ -48,6 +49,17 @@ function [results] = modmed(T,varargin)
 %       .kappa2 = Effect size; ranges between 0 and 1: the proportion of the maximum possible indirect effect that could have occurred. 
 %       .clim = bootstrapped confidence limits for each of the parameters.
 %       .parms = parameters passed to this function.
+%       .lm6 =  Linear Mixed Model of the full regression (Eq6 in Muller et al)
+% The .style struct interprets the mediation analysis outcomes following
+% the rules of Muller et al. This is based on the significance of paths 
+%       .style.modMed = Logical [1 nrMediators]. True for each mediator that is determined to be a moderated mediator
+%       .style.medMod = Logical [1 nrMediators]. True for each mediator that mediates the moderator.
+%       .style.prototypical = Logical [1 nrMediators]. True for a moderator
+%          that does not interact significantly with the treatment in
+%           moderated mediation. (i.e. the moderation is only significant with
+%           the mediator included). Muller et all call this prototypical
+%           moderated mediation.
+%       .style.med = Logical [1 nrMediators]. True for each mediator (only assessed if no moderator is specified).
 %
 % EXAMPLE
 %
@@ -55,12 +67,15 @@ function [results] = modmed(T,varargin)
 % Example data from Muller et al are stored in the examples folder.
 %
 % medmodT = readtable('yzerbyt.medmod.csv'); 
-% results lm.modmed(medmodT,'treatment','PRIME','moderator','SVO','mediator','EXP','outcome','BEH','bootstrap',100);
-% lm.plotModMed(a);
+%  Run a small number of bootstraps to save time. 
+% results =  lm.modmed(medmodT,'treatment','PRIME','moderator','SVO','mediator','EXP','outcome','BEH','bootstrap',100);
+% Show results with kappa2
+% lm.plotModMed(results,'effectSize','kappa2');
 %
 % modMedT = readtable('yzerbyt.modmed.csv');
-% lm.modmed(modMedT,'treatment','MOOD','moderator','NFC','mediator','POS','outcome','ATT');
-%
+% results = lm.modmed(modMedT,'treatment','MOOD','moderator','NFC','mediator','POS','outcome','ATT','bootstrap',100);
+% lm.plotModMed(results,'effectSize','kappa2');
+% 
 % BK -    August 2021
 
 p= inputParser;
@@ -118,15 +133,20 @@ if ~isempty(p.Results.randomEffects)
     eq6  = [eq6 '+' p.Results.randomEffects];
 end
 
-[results.a,results.b,results.c,results.cPrime,results.ab,results.kappa2,results.moderatorValues, results.lm6] = locRegression(T,eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
+[results.a,results.b,results.c,results.cPrime,results.ab,results.kappa2,results.moderatorValues, results.style, results.lm6] = locRegression(T,eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
 %% Boostrap confidence limits by resampling the rows in T (trials, presumably)
+if hasModerator
+    nrModeratorValues= size(results.a,2);
+else
+    nrModeratorValues= 1;
+end
 if p.Results.bootstrap>0
-    bsA = nan([size(results.a) p.Results.bootstrap]);
-    bsB = nan([size(results.a) p.Results.bootstrap]);
-    bsC = nan([1 size(results.a,2) p.Results.bootstrap]);
-    bsCPrime = nan([1, size(results.a,2) p.Results.bootstrap]);
-    bsKappa2 = nan([size(results.a) p.Results.bootstrap]);
-    bsAB = nan([size(results.a) p.Results.bootstrap]);
+    bsA = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
+    bsB =  nan([nrMediators nrModeratorValues p.Results.bootstrap]);
+    bsC = nan([1 nrModeratorValues p.Results.bootstrap]);
+    bsCPrime = nan([1, nrModeratorValues p.Results.bootstrap]);
+    bsKappa2 = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
+    bsAB = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
     for bs = 1:p.Results.bootstrap
         ix= randi(height(T),height(T),1); % Resample with replacement
         [bsA(:,:,bs),bsB(:,:,bs),bsC(:,:,bs),bsCPrime(:,:,bs),bsAB(:,:,bs),bsKappa2(:,:,bs)] = locRegression(T(ix,:),eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
@@ -146,7 +166,7 @@ results.parms = p.Results;
 end
 
 %%
-function [a,b,c,cPrime,ab,kappa2,moderatorValue,lm6] = locRegression(T,eq4,eq5,eq6,treatment,mediators,moderator,dummyVar,alpha)
+function [a,b,c,cPrime,ab,kappa2,moderatorValue,style,lm6] = locRegression(T,eq4,eq5,eq6,treatment,mediators,moderator,dummyVar,alpha)
 %% Fit the linear models and extract betas and p-valus using the nomenclature of the paper.
 nrMediators = numel(mediators);
 hasModerator = ~isempty(moderator);
@@ -161,9 +181,6 @@ is41 = strcmpi(lm4.anova.Term,treatment);
 if hasModerator
     is42 = strcmpi(lm4.anova.Term,moderator);
     is43 = strcmpi(lm4.anova.Term,[treatment ':' moderator])| strcmpi(lm4.anova.Term,[moderator ':' treatment ]);
-else
-    is42 = [];
-    is43 = [];
 end
 is51 = cell(1,nrMediators);
 is52 = cell(1,nrMediators);
@@ -173,9 +190,6 @@ for i=1:nrMediators
     if hasModerator
         is52{i} = strcmpi(lm5{i}.anova.Term,moderator);
         is53{i} = strcmpi(lm5{i}.anova.Term,[treatment ':' moderator]) | strcmpi(lm5{i}.anova.Term,[moderator ':' treatment]);
-    else
-        is52{i} = [];
-        is53{i} = [];
     end
 end
 
@@ -186,47 +200,63 @@ for i=1:nrMediators
     is64{i} = strcmpi(mediators{i},lm6.anova.Term);
     if hasModerator
         is65{i} = strcmpi(lm6.anova.Term,[mediators{i} ':' moderator]) | strcmpi(lm6.anova.Term,[moderator ':' mediators{i}]);
-    else
-        is65{i} = [];
     end
 end
 if hasModerator
     is62 = strcmpi(lm6.anova.Term,moderator);
     is63 = strcmpi(lm6.anova.Term,[treatment ':' moderator]) | strcmpi(lm6.anova.Term,[moderator ':' treatment]);
-else
-    is62 = [];
-    is63 = [];
 end
 
+
 b41 = lm4.Coefficients.Estimate(is41);
-b42 = lm4.Coefficients.Estimate(is42);
-b43 = lm4.Coefficients.Estimate(is43);
 p41   = lm4.Coefficients.pValue(is41);
-p42  = lm4.Coefficients.pValue(is42);
-p43  = lm4.Coefficients.pValue(is43);
+if hasModerator
+    b42 = lm4.Coefficients.Estimate(is42);    
+    b43 = lm4.Coefficients.Estimate(is43);
+    p42  = lm4.Coefficients.pValue(is42);
+    p43  = lm4.Coefficients.pValue(is43);
+else
+    b42 = 0;
+    b43 = 0;
+    p42 = 1;
+    p43 =1;
+end
 
 for i=1:nrMediators
     b51(i) = lm5{i}.Coefficients.Estimate(is51{i});
-    b52(i) = lm5{i}.Coefficients.Estimate(is52{i});
-    b53(i) = lm5{i}.Coefficients.Estimate(is53{i});
     p51(i)   = lm5{i}.Coefficients.pValue(is51{i});
-    p52(i)  = lm5{i}.Coefficients.pValue(is52{i});
-    p53(i)  = lm5{i}.Coefficients.pValue(is53{i});
-    
     b64(i) = lm6.Coefficients.Estimate(is64{i});
-    b65(i) = lm6.Coefficients.Estimate(is65{i});
     p64(i)  = lm6.Coefficients.pValue(is64{i});
-    p65(i)  = lm6.Coefficients.pValue(is65{i});
+    if hasModerator
+        b52(i) = lm5{i}.Coefficients.Estimate(is52{i});
+        b53(i) = lm5{i}.Coefficients.Estimate(is53{i});           
+        p52(i)  = lm5{i}.Coefficients.pValue(is52{i});
+        p53(i)  = lm5{i}.Coefficients.pValue(is53{i});    
+        b65(i) = lm6.Coefficients.Estimate(is65{i});
+        p65(i)  = lm6.Coefficients.pValue(is65{i});
+    else 
+        b53(i) = 0;
+        b65(i) = 0;
+        p53(1)  = 1;
+        p65(i) = 1;
+    end
     
 end
 b61 = lm6.Coefficients.Estimate(is61);
-b62 = lm6.Coefficients.Estimate(is62);
-b63 = lm6.Coefficients.Estimate(is63);
-
-
 p61   = lm6.Coefficients.pValue(is61);
-p62  = lm6.Coefficients.pValue(is62);
-p63  = lm6.Coefficients.pValue(is63);
+if hasModerator
+    b62 = lm6.Coefficients.Estimate(is62);
+    b63 = lm6.Coefficients.Estimate(is63);
+    p62  = lm6.Coefficients.pValue(is62);
+    p63  = lm6.Coefficients.pValue(is63);
+else
+    b62 = 0;
+    b63 = 0;
+    p62 = 1;
+    p63 = 1;
+end
+
+
 
 
 isMed =false(1,nrMediators);
@@ -249,14 +279,20 @@ if hasModerator
 else
     %% Asses mediation
     overalTreatmentEffect = p41< alpha;
+    isModMedPrototypical = false(1,nrMediators);
+    isMedMod = false(1,nrMediators);
+    isModMed = false(1,nrMediators);        
     for i=1:nrMediators
-        isMedMod(i) = false;
-        isModMed(i) = false;
         treatmentAffectsMediator = p51(i) < alpha;
         mediatorReducesTreatment  = p64(i) < alpha && abs(b61) < abs(b41); % The latter term needs statistical evaluation...
         isMed(i) = overalTreatmentEffect && treatmentAffectsMediator && mediatorReducesTreatment;
     end
 end
+
+style.modMed = isModMed;
+style.medMod = isMedMod;
+style.med    = isMed;
+style.prototypical = isModMedPrototypical;
 
 %% Calculate a,b,c,c'
 % In the presence of moderators, we compute these at the lowest and highest
