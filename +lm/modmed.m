@@ -151,13 +151,22 @@ if p.Results.bootstrap>0
         ix= randi(height(T),height(T),1); % Resample with replacement
         [bsA(:,:,bs),bsB(:,:,bs),bsC(:,:,bs),bsCPrime(:,:,bs),bsAB(:,:,bs),bsKappa2(:,:,bs)] = locRegression(T(ix,:),eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
     end
-    % Determine percentiles
+    % Determine specified percentiles
     results.clim.a = prctile(bsA,p.Results.confLimits,3);
     results.clim.b = prctile(bsB,p.Results.confLimits,3);
     results.clim.c = prctile(bsC,p.Results.confLimits,3);
     results.clim.cPrime = prctile(bsCPrime,p.Results.confLimits,3);
     results.clim.kappa2 = prctile(bsKappa2,p.Results.confLimits,3);
     results.clim.ab = prctile(bsAB,p.Results.confLimits,3);
+    % And store a range of percentiles just in case...
+    step = 100/(p.Results.bootstrap/10); % 1% bins for 1000 bs, 0.1% for 10000
+    bins = 0:step:100;
+    results.bs.a =prctile(bsA,bins,3);
+    results.bs.b =prctile(bsB,bins,3);
+    results.bs.c =prctile(bsC,bins,3);
+    results.bs.cPrime =prctile(bsCPrime,bins,3);
+    results.bs.kappa2 =prctile(bsKappa2,bins,3);
+    results.bs.ab =prctile(bsAB,bins,3);    
 else
     results.clim = [];
 end

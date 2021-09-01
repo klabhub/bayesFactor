@@ -35,7 +35,7 @@ if ischar(results.parms.mediator);mediators={results.parms.mediator};else; media
 nrMediators = numel(mediators);
 % The nodes are ordered as TRREATMENT OUTCOME MEDIATORS, with the latter
 % ordered as the names in mediator
-nodeNames= cat(2,{[results.parms.treatment] [ results.parms.outcome]},mediators);
+nodeNames= cat(2,{[results.parms.treatment] [ results.parms.outcome]},mediators(:)');
 TREATMENT =1;
 OUTCOME =2;
 nrModeratorValues= size(results.a,2);
@@ -110,7 +110,7 @@ for mo =1:nrModeratorValues
     end
     % Store in Nodes table
     G.Nodes= addvars(G.Nodes,[true; true; prod(sign(results.clim.ab(:,mo,:)),3)>0],...
-                                            [0;0;abs(results.ab(:,mo))],...
+                                            [0;0;results.ab(:,mo)],...
                                             nodeLabels, 'NewVariableNames',{'abSignificant','ab','labels'});
     % Remove mediator nodes whose ab path is not signficant
     if p.Results.sigMediatorOnly                
@@ -129,10 +129,10 @@ for mo =1:nrModeratorValues
     thisStyle = styles(isSignificant+1);    
     % Postition the mediators in the graph such that the strongest ab path
     % is on top.
-    X = [0 1 0.5*ones(1,G.numnodes-2)];
-    Y = [0 0 (1:G.numnodes-2)];
-    [~,ordered] = sort(G.Nodes.ab(3:end),'ascend');
-    Y  = Y([1 2 ordered'+2]);
+    X = [0 1 0.5*ones(1,G.numnodes-2)];    
+    [~,ordered] = sort(abs(G.Nodes.ab(3:end)),'ascend');
+    [~,y] =sort(ordered);
+    Y  = [0 0 y'];
     
     h =  plot(G,'EdgeLabel',edgeLabels,'NodeLabel',G.Nodes.labels,'XData',X,'YData',Y,'LineStyle',thisStyle');
     set(h,props);
