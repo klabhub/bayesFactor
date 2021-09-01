@@ -57,6 +57,7 @@ p.addParameter('sesoi',[],@isnumeric);
 p.addParameter('fixedEffectsScale',[],@isnumeric);
 p.addParameter('randomEffectsScale',[],@isnumeric);
 p.addParameter('qcFunction',@(x)(x),@(x)isa(x,'function_handle')); % Apply QC to each simulated set.
+p.addParameter('maxLossToQc',1,@(x) (isnumeric(x) && x>0 && x <1)); % If QC removes more than this fraction [0 1], an error is gnerated.
 p.addParameter('graph',false,@islogical);
 p.addParameter('names',{},@iscell);
 p.addParameter('multipleComparisonsProcedure','none',@(x)(ischar(x) && ismember(upper(x),{'FDR','BONFERRONI','NONE'})));
@@ -69,6 +70,7 @@ end
 dummyVarCoding = lm.dummyVarCoding(m);
 % Extract from p to avoid broadcasting and initialize outputs
 alpha = p.Results.alpha;
+maxLossToQc = p.Results.maxLossToQc;
 nrSubjectsToSimulate= p.Results.nrSubjects(:)';
 nrWorkers = p.Results.nrWorkers;
 nrMonteCarlo = p.Results.nrMonteCarlo;
@@ -159,7 +161,7 @@ end
 mcpfun = @multicomp; % Hack to use the nested function in the parfor using feval
 
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
-  %    for i=1:nrMonteCarlo  % For debugggin without parfor
+      %for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN
         
         % Generate surrogate data based on the model
@@ -208,7 +210,14 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
         end
         if ~isempty(qcFunction)
             % Apply quality control function to the simulated data set.
+            before  = height(simT);
             simT = qcFunction(simT);
+            after  = height(simT);
+            loss = abs(after-before)/before;
+            if loss > maxLossToQc
+                fprintf('Losing too many observations to QC (%2.2f %%). Simulation skipped.\n', 100*loss);
+                continue; % Go to the next
+            end
         end
         
         % Refit the model
@@ -276,7 +285,7 @@ if p.Results.graph
     end
     powerValues = {anovaPower,contrastPower,equivalencePower};
     for i=1:3
-        if ~isempty(powerValues{i})
+        if ~isempty(powerValues{i}) && ~any(isnan(powerValues{i}),'all')
             if nrN>1
                 iPower = interp1(nrSubjectsToSimulate,powerValues{i},iSubjects,'pchip');
             else
