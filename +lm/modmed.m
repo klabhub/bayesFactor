@@ -30,11 +30,24 @@ function [results] = modmed(T,varargin)
 %               empty).
 % randomEffects - Formula to specify random effects (e.g. (1|subject) to
 %                   allow a random intercept per subject.
+% nuisance - Formula to specify nuisance variables to include in each model
+% 
 % alpha - significance level to use (0.05)
 % dummyVarCoding - Coding to use for categorical variables (Effects)
 % exclude - Rows of the datatable to exclude from all models.
 % bootstrap - Number of bootstrap samples to use to estimate confidence
 %               intervals.
+%               The default is to resample rows of the data table T.
+%               Presumably these are observations (e.g. trials). To
+%               resample subjects or some unique combination of column
+%               values in the table, use groupResampling.
+% groupResampling - Defaults to ''. Used only for the resampling of
+% bootstrap sets. Set this to a column name to resample (with replacement)
+% unique values of that column in the table. Use a cell array of strings to
+% combine multiple columns. For instance, 'subjectNr' to resample all rows
+% corresponding to a unique subjectNr, or {'subjectNr','runNr'} to resample
+% runs per subject. 
+%
 % matchMissing - [true] If the data set has missing values, the models for
 % the overall outcome and mediator could be based on different subdatasets
 % (depedning on what is missing). By setting this to false, each model uses
@@ -91,12 +104,14 @@ p.addParameter('outcome','',@ischar);
 p.addParameter('treatment','',@ischar);
 p.addParameter('mediator','',@(x) ischar(x) || iscellstr(x) || isstring(x));
 p.addParameter('moderator','',@ischar);
+p.addParameter('nuisance','',@ischar);
 p.addParameter('randomEffects','',@ischar);
 p.addParameter('alpha',0.05,@isnumeric);
 p.addParameter('dummyVarCoding','effects',@ischar);
 p.addParameter('exclude',[],@islogical);
 p.addParameter('matchMissing',true,@islogical);
 p.addParameter('bootstrap',1,@isnumeric);
+p.addParameter('groupResampling','',@(x) (iscellstr(x) || ischar(x)));
 p.addParameter('nrWorkers',1,@isnumeric);
 p.parse(varargin{:})
 
@@ -107,6 +122,8 @@ else
 end
 nrMediators = numel(mediators);
 hasModerator = ~isempty(p.Results.moderator);
+hasNuisance = ~isempty(p.Results.nuisance);
+hasRandomEffects = isempty(p.Results.randomEffects);
 
 if ~isempty(p.Results.exclude)
     T= T(~p.Results.exclude,:);
@@ -142,22 +159,33 @@ end
 % bMeMo refers to an interaction beta for Mediators and Moderator.
 
 % Construct the formulas for equations 4,5,6
+% Eq 4: treatment ->outcome
 eq4 = [p.Results.outcome '~' p.Results.treatment];
 if hasModerator
     eq4 = [eq4  ' + ' p.Results.moderator '+' p.Results.moderator ':' p.Results.treatment];
-    
 end
+ if hasNuisance
+     eq4  = [eq4 '+' p.Results.nuisance];
+ end
+ if hasRandomEffects
+         eq4  = [eq4 '+' p.Results.randomEffects];
+ end
+  % Eq 5: treatment -> mediator
 eq5= cell(1,nrMediators);
 for i=1:nrMediators
     eq5{i} = [mediators{i} '~' p.Results.treatment];
     if hasModerator
         eq5{i}= [eq5{i}  ' + ' p.Results.moderator '+' p.Results.moderator ':' p.Results.treatment];
     end
-    if ~isempty(p.Results.randomEffects)
+    if hasNuisance
+     eq5{i}  = [eq5{i} '+' p.Results.nuisance];
+    end    
+    if hasRandomEffects 
         eq5{i}  = [eq5{i} '+' p.Results.randomEffects];
-    end
+    end    
 end
 
+% Eq6 : (treatment, mediators)->outcome
 eq6 = [p.Results.outcome '~' p.Results.treatment ];
 if hasModerator
     eq6 = [eq6  ' + ' p.Results.moderator '+' p.Results.moderator ':' p.Results.treatment];
@@ -168,8 +196,10 @@ for i=1:nrMediators
         eq6 = [eq6 ' + ' mediators{i} ':' p.Results.moderator]; %#ok<AGROW>
     end
 end
-if ~isempty(p.Results.randomEffects)
-    eq4  = [eq4 '+' p.Results.randomEffects];
+if hasNuisance
+     eq6  = [eq6 '+' p.Results.nuisance];
+ end
+if hasRandomEffects
     eq6  = [eq6 '+' p.Results.randomEffects];
 end
 
@@ -192,9 +222,24 @@ if p.Results.bootstrap>0
     moderator= p.Results.moderator;
     dummyVarCoding=p.Results.dummyVarCoding;
     alpha = p.Results.alpha;
+    groupResampling = p.Results.groupResampling;
+    if ~isempty(groupResampling)
+       uGrpT =unique(T(:,p.Results.groupResampling),'rows');    
+    else 
+        uGrpT = NaN; % Not used but parfor wants this defined.
+    end
     parfor (bs = 1:p.Results.bootstrap, p.Results.nrWorkers)
-        ix= randi(height(T),height(T),1); % Resample with replacement
-        [bsA(:,:,bs),bsB(:,:,bs),bsC(:,:,bs),bsCPrime(:,:,bs),bsAB(:,:,bs),bsKappa2(:,:,bs)] = locRegression(T(ix,:),eq4,eq5,eq6,treatment,mediators,moderator,dummyVarCoding,alpha);
+        if isempty(groupResampling)
+            % Resample rows (trials probably) with replacement
+            ix= randi(height(T),height(T),1); 
+            thisT  = T(ix,:);
+        else
+            % Resample uniue groups (subjects or some combo of subject and run)
+            grpIx = randi(height(uGrpT),height(uGrpT),1); 
+            thisGrpT = uGrpT(grpIx,:);
+            thisT = innerjoin(thisGrpT,T,'Keys',groupResampling);
+        end
+        [bsA(:,:,bs),bsB(:,:,bs),bsC(:,:,bs),bsCPrime(:,:,bs),bsAB(:,:,bs),bsKappa2(:,:,bs)] = locRegression(thisT,eq4,eq5,eq6,treatment,mediators,moderator,dummyVarCoding,alpha);
     end
     % Determine specified percentiles
     confLimits = 100*[p.Results.alpha/2 1-p.Results.alpha/2];
@@ -323,15 +368,15 @@ for i=1:nrMediators
             
             if i==1
                 isXMo43 =  strcmpi(lm4.CoefficientNames,[lm4.CoefficientNames{isX41} ':' moderator]) | strcmpi(lm4.CoefficientNames,[moderator ':' lm4.CoefficientNames{isX41} ]);;
-                bXMo43 = lm4.Coefficients.Estimate(isXMo43);
+                bXMo43 = lm4.Coefficients.Estimate(isXMo43)*moderatorLevels;
                 isXMo63 =  strcmpi(lm6.CoefficientNames,[lm6.CoefficientNames{isX61} ':' moderator]) | strcmpi(lm6.CoefficientNames,[moderator ':' lm6.CoefficientNames{isX61} ]);
-                bXMo63 =  lm6.Coefficients.Estimate(isXMo63);
+                bXMo63 =  lm6.Coefficients.Estimate(isXMo63)*moderatorLevels;
             end
             
             isXMo53 =  strcmpi(lm5{i}.CoefficientNames,[lm5{i}.CoefficientNames{isX51} ':' moderator]) |  strcmpi(lm5{i}.CoefficientNames,[moderator ':' lm5{i}.CoefficientNames{isX51} ]);;
-            bXMo53 =  lm5{i}.Coefficients.Estimate(isXMo53);
+            bXMo53 =  lm5{i}.Coefficients.Estimate(isXMo53)*moderatorLevels;
             isMeMo65 =  strcmpi(lm6.CoefficientNames,[lm6.CoefficientNames{isMe64} ':' moderator]) | strcmpi(lm6.CoefficientNames,[moderator ':' lm6.CoefficientNames{isMe64}]);
-            bMeMo65 =  lm6.Coefficients.Estimate(isMeMo65);
+            bMeMo65 =  lm6.Coefficients.Estimate(isMeMo65)*moderatorLevels;
         elseif isa(T.(moderator),'categorical') || isa(T.(moderator),'ordinal')
             if i==1
                 bXMo43 =moderatorBeta(lm4,treatment,moderator);

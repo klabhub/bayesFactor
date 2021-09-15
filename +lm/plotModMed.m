@@ -26,6 +26,7 @@ function G = plotModMed(results,varargin)
 
 p =inputParser;
 p.addParameter('sigMediatorOnly',false,@(x) (islogical(x) || isnumeric(x) ));
+p.addParameter('anyModIsSig',true,@islogical);
 p.addParameter('effectSize','none',@ischar);
 p.parse(varargin{:});
 
@@ -62,9 +63,9 @@ for mo =1:nrModeratorValues
     thisStyle = styles(isSignificant+1);
     G{1,mo}= digraph(TREATMENT,OUTCOME,results.c(mo),nodeNames(1:2));
     
-    edgeLabels = sprintf('c: %3.2f ',results.c(1,mo));
+    edgeLabels = sprintf('c: %3.2g ',results.c(1,mo));
     if results.parms.bootstrap
-        edgeLabels = sprintf('%s CI [%3.2f %3.2f]',edgeLabels,results.clim.c(1,mo,:));
+        edgeLabels = sprintf('%s CI [%3.2g %3.2g]',edgeLabels,results.clim.c(1,mo,:));
     end
     h =  plot(G{1,mo},'EdgeLabel',{edgeLabels},'XData',[0 1],'YData',[0 0],'LineStyle',thisStyle);
     set(h,props);
@@ -89,17 +90,17 @@ for mo =1:nrModeratorValues
     t(1) = OUTCOME;
     
     
-    edgeLabels{1} = sprintf('c'': %3.2f ',results.cPrime(mo));
+    edgeLabels{1} = sprintf('c'': %3.2g ',results.cPrime(mo));
     if results.parms.bootstrap
         isSignificant(1) = prod(sign(results.clim.cPrime(1,mo,:)))>0;
-        edgeLabels{1} = sprintf('%s CI [%3.2f %3.2f]',edgeLabels{1},results.clim.cPrime(1,mo,:));
+        edgeLabels{1} = sprintf('%s CI [%3.2g %3.2g]',edgeLabels{1},results.clim.cPrime(1,mo,:));
     end
     % a-paths
     for i=1:nrMediators
-        edgeLabels{1+i} = sprintf('a: %3.2f ',results.a(i,mo));
+        edgeLabels{1+i} = sprintf('a: %3.2g ',results.a(i,mo));
         if results.parms.bootstrap
             isSignificant(1+i) = prod(sign(results.clim.a(i,mo,:)))>0;
-            edgeLabels{1+i} = sprintf('%s CI [%3.2f %3.2f]',edgeLabels{1+i},results.clim.a(i,mo,:));
+            edgeLabels{1+i} = sprintf('%s CI [%3.2g %3.2g]',edgeLabels{1+i},results.clim.a(i,mo,:));
         end
         s(1+i) = TREATMENT;
         t(1+i) = 2+i;
@@ -108,10 +109,10 @@ for mo =1:nrModeratorValues
     end
     % b-paths
     for i=1:nrMediators
-        edgeLabels{1+nrMediators+i} = sprintf('b: %3.2f ',results.b(i,mo));
+        edgeLabels{1+nrMediators+i} = sprintf('b: %3.2g ',results.b(i,mo));
         if results.parms.bootstrap
             isSignificant(1+nrMediators+i) = prod(sign(results.clim.b(i,mo,:)))>0;
-            edgeLabels{1+nrMediators+i} = sprintf('%s CI [%3.2f %3.2f]',edgeLabels{1+nrMediators+i},results.clim.b(i,mo,:));
+            edgeLabels{1+nrMediators+i} = sprintf('%s CI [%3.2g %3.2g]',edgeLabels{1+nrMediators+i},results.clim.b(i,mo,:));
         end
         
         s(1+nrMediators+i) = 2+i;
@@ -124,9 +125,9 @@ for mo =1:nrModeratorValues
     % Add labels with ab estimates and (optionally) effect size
     for n=1:G{2,mo}.numnodes
         if n>2
-            nodeLabels{n} = sprintf('%s ab: %3.2f ', nodeNames{n},results.ab(n-2,mo));
+            nodeLabels{n} = sprintf('%s ab: %3.2g ', nodeNames{n},results.ab(n-2,mo));
             if results.parms.bootstrap>0
-                nodeLabels{n} = sprintf('%s CI [%3.2f %3.2f]', nodeLabels{n},results.clim.ab(n-2,mo,:));
+                nodeLabels{n} = sprintf('%s CI [%3.2g %3.2g]', nodeLabels{n},results.clim.ab(n-2,mo,:));
             end
             switch p.Results.effectSize
                 case 'none'
@@ -156,12 +157,15 @@ for mo =1:nrModeratorValues
         lims = 100*[p.Results.sigMediatorOnly/2 1-p.Results.sigMediatorOnly/2];
         lower = find(results.bs.bins<=lims(1),1,'last');
         upper = find(results.bs.bins>=lims(2),1,'first');
-        abSignificantPerMod = [true; true; prod(sign(results.bs.ab(:,:,[lower upper])),3)>0];        
+        abSignificantPerMod =  prod(sign(results.bs.ab(:,:,[lower upper])),3)>0;        
     else
-        abSignificantPerMod = true(2+nrMediators,nrModerators,1);
+        abSignificantPerMod = true(nrMediators,nrModeratorValues,1);
     end
-    
-    abSignificant = [true; true; any(abSignificantPerMod,2)];
+        if p.Results.anyModIsSig
+        abSignificant = [true; true; any(abSignificantPerMod,2)];
+        else
+            abSignificant = [true; true; abSignificantPerMod(:,mo,:)];
+        end
     
     G{2,mo}.Nodes= addvars(G{2,mo}.Nodes,...
         abSignificant,...
