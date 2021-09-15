@@ -69,7 +69,11 @@ function [results] = modmed(T,varargin)
 %                    mediators)
 %       .kappa2 = Effect size; ranges between 0 and 1: the proportion of the maximum possible indirect effect that could have occurred.
 %       .clim = bootstrapped confidence limits for each of the parameters.
-%       .parms = parameters passed to this function.
+%       .parms = parameters passed to this function. 
+%       .rho   = Correlation ebtween the residuals of the
+%       treatment->mediator and treatment->outcom (full model). The
+%       assumption of the analysis is that this is zero. ("Sequential
+%       Ignorability")
 %       .lm6 =  Linear Mixed Model of the full regression (Eq6 in Muller et al)
 % The .style struct interprets the mediation analysis outcomes following
 % the rules of Muller et al. This is based on the significance of paths
@@ -204,7 +208,7 @@ if hasRandomEffects
 end
 
 % Computer in a sub to simplify bootstratpping
-[results.a,results.b,results.c,results.cPrime,results.ab,results.kappa2,results.moderatorValues, results.style, results.lm6] = locRegression(T,eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
+[results.a,results.b,results.c,results.cPrime,results.ab,results.kappa2,results.moderatorValues, results.style, results.rho, results.lm6] = locRegression(T,eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
 %% Boostrap confidence limits by resampling the rows in T (trials, presumably)
 if hasModerator
     nrModeratorValues= size(results.a,2);
@@ -267,7 +271,7 @@ results.parms = p.Results;
 end
 
 %%
-function [a,b,c,cPrime,ab,kappa2,moderatorLevels,style,lm6] = locRegression(T,eq4,eq5,eq6,treatment,mediators,moderator,dummyVar,alpha)
+function [a,b,c,cPrime,ab,kappa2,moderatorLevels,style,rho,lm6] = locRegression(T,eq4,eq5,eq6,treatment,mediators,moderator,dummyVar,alpha)
 %% Fit the linear models and extract betas and p-valus using the nomenclature of the paper.
 nrMediators = numel(mediators);
 hasModerator = ~isempty(moderator);
@@ -352,10 +356,10 @@ end
 nrModeratorLevels= numel(moderatorLevels);
 a =nan(nrMediators,nrModeratorLevels);
 b =nan(nrMediators,nrModeratorLevels);
-
+bX51 = nan(nrMediators,1);
 for i=1:nrMediators
     isX51 =  startsWith(lm5{i}.CoefficientNames,treatment)  & ~contains(lm5{i}.CoefficientNames,':');
-    bX51 = lm5{i}.Coefficients.Estimate(isX51);
+    bX51(i) = lm5{i}.Coefficients.Estimate(isX51);
     isMe64 =  startsWith(lm6.CoefficientNames,mediators{i}) & ~contains(lm6.CoefficientNames,':');
     bMe64 = lm6.Coefficients.Estimate(isMe64);
     
@@ -393,7 +397,7 @@ for i=1:nrMediators
         bXMo53 = 0;
         bMeMo65=0;
     end
-    a(i,:) = bX51 + bXMo53;
+    a(i,:) = bX51(i) + bXMo53;
     b(i,:) = bMe64 +bMeMo65;
     
 end
@@ -440,8 +444,30 @@ style.prototypical = isModMedPrototypical;
 
 
 
-
-
+%% Sensitivity
+%  Imai et al correlation based sensitivity analysis. 
+% Not clear if this is valid for moderated mediation, multiple mediators,
+% and mixed models....so commented out.
+% 
+rho = nan(nrMediators,1);
+for i=1:nrMediators
+    rho(i) = corr(lm5{i}.residuals,lm6.residuals);     
+ end
+% uT = unique(T.(treatment));
+% nrTreatment = numel(uT);
+% e1 = lm4.residuals;
+% for t=1:nrTreatment
+%     stayT =T.(treatment)==uT(t);
+%     sigma1t(t) =sqrt(var(e1(stayT)));
+%     for i=1:nrMediators
+%         e2 = lm5{i}.residuals;
+%         sigma2t(i,t) = sqrt(var(e2(stayT)));
+%         thisR = corrcoef(e1(stayT),e2(stayT));
+%         rhot(i,t) = thisR(1,2);        
+%     end
+% end
+% rho = repmat(rho,[1 nrTreatment]);
+% delta  = (repmat(bX51,[1 nrTreatment]).*repmat(sigma1t,[nrMediators 1])./sigma2t).* (rhot-rho.*sqrt((1-rhot.^2)./(1-rho.^2)))
 
 %% Effect sizes
 % Preacher KJ, Kelley K (2011) Effect size measures for mediation models:
