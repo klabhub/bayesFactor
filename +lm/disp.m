@@ -1,28 +1,28 @@
 function disp(m,factors,showEffects,tol)
-% Convenience disp function to show Anova results of a linear model in 
+% Convenience disp function to show Anova results of a linear model in
 % standard notation for easy copy and paste.
 %
 % INPUT
 %  m =  a linear model
 % factors = a cell array of factors whose stats are to be shown. Defaults
 % to all but the Intercept.
-% showEffects = Show effect sizes. 
+% showEffects = Show effect sizes.
 %                       PARTIALETA - an standardized effect size , may be
-%                       of limited use for LMM  
-  %                      'Intercept' ; scale to the fixed intercept effect
+%                       of limited use for LMM
+%                      'Intercept' ; scale to the fixed intercept effect
 %                       'RANDOMSTD' : scale to the standard deviation of
 %                       the random effects.
-%                       'RAW' - do not scale 
+%                       'RAW' - do not scale
 % tol = Tolerance for partial eta squared confidence intervals
 % OUTPUT
 % output is written to the command line only.
-% 
+%
 % BK - Feb 2020
 if nargin<2 || isempty(factors)
-        factors =m.anova.Term(2:end);
+    factors =m.anova.Term(2:end);
 end
 if nargin <3
-    showEffects = 'none';
+    showEffects = 'raw';
 end
 if islogical(showEffects)
     showEffects = 'raw';
@@ -63,58 +63,42 @@ for f=1:numel(factors)
     if m.anova.pValue(stay,1) <0.05
         style = 2; % Error output stream ; red
     else
-        style =1; % stdout; 
+        style =1; % stdout;
     end
-    if contains(showEffects,'INTERCEPT','IgnoreCase',true)
-                    % Scale to the fixed effect intercept
-                    % How big is the effect relative to the grand mean.
-                    scale  = 0.01*m.Coefficients.Estimate(strcmpi(m.CoefficientNames,'(Intercept)'));                    
-                    units = '%%';
-    elseif contains(showEffects,'RANDOMSTD','IgnoreCase',true)
-                    % Scale to the standard deviation of the random effects
-                    % "How big is the effect relative to the variation
-                    % across subjects?'
-                    scale = 0.01*std(m.randomEffects,'IgnoreCase',true);
-                    units = '%%';
-    elseif contains(showEffects,'RAW','IgnoreCase',true)
-                    % Effect in raw model units'
-                    scale =1;
-                    units = '';                            
-        else
-            scale =1;
-            units = '';
-    end
-        
-        fe = m.fixedEffects;
-        elms = strsplit(factor,':');
-        nrElms =numel(elms);
-        for e=1:nrElms
-            if m.VariableInfo{elms{e},'IsCategorical'}
-                elms{e} = [elms{e} '_[^:]+'];
-            end
-            if nrElms>1 && e <nrElms
-                elms{e} = [elms{e} ':'];
-            end
+
+    [scale,units] = lm.scaleFactor(m,showEffects);
+    
+    fe = m.fixedEffects;
+    elms = strsplit(factor,':');
+    nrElms =numel(elms);
+    for e=1:nrElms
+        if m.VariableInfo{elms{e},'IsCategorical'}
+            elms{e} = [elms{e} '_[^:]+'];
         end
-        expression  = ['^' strcat(elms{:}) '$'] ;
-        stayFe = ~cellfun(@isempty, regexp(m.CoefficientNames,expression));
-        
-            % Find the corresponding linear effect (or the largest one for
-            % a multilevel categorical factor).
-         
-            fe = fe(stayFe)/scale;
-            [fe,ix] = max(fe);
-            low = m.Coefficients.Lower(stayFe);
-            low = low(ix)/scale;
-            up =m.Coefficients.Upper(stayFe);
-            up = up(ix)/scale;
-            vars = cat(2,vars,{fe,low,up});
-            if sum(stayFe)>1
-                fmt = cat(2, fmt ,[' (Max Effect: %3.3g ' units ' CI [%4.4g, %4.4g])']);                    
-            else
-                fmt = cat(2, fmt ,[' (Effect: %3.3g ' units '  CI [%4.4g, %4.4g])']);                    
-            end
-        
+        if nrElms>1 && e <nrElms
+            elms{e} = [elms{e} ':'];
+        end
     end
-    fprintf(style,[fmt '\n'],vars{:});    
+    expression  = ['^' strcat(elms{:}) '$'] ;
+    stayFe = ~cellfun(@isempty, regexp(m.CoefficientNames,expression));
+    
+    % Find the corresponding linear effect (or the largest one for
+    % a multilevel categorical factor).
+    
+    fe = fe(stayFe)/scale;
+    [fe,ix] = max(fe);
+    low = m.Coefficients.Lower(stayFe);
+    low = low(ix)/scale;
+    up =m.Coefficients.Upper(stayFe);
+    up = up(ix)/scale;
+    vars = cat(2,vars,{fe,low,up});
+    if sum(stayFe)>1
+        fmt = cat(2, fmt ,[' (Max Effect: %3.3g ' units ' CI [%4.4g, %4.4g])']);
+    else
+        fmt = cat(2, fmt ,[' (Effect: %3.3g ' units '  CI [%4.4g, %4.4g])']);
+    end
+    
+    fprintf(style,[fmt '\n'],vars{:});
+    
+end
 end

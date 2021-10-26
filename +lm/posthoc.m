@@ -1,4 +1,4 @@
-function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail,alpha)
+function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail,alpha,scaleMode)
 % Perform a posthoc comparison of condition A and B in a Linear Mixed Model,
 % using coefTest, but using cell arrays of parm/value pairs to specify conditions A and B
 % instead of the contrast
@@ -12,6 +12,8 @@ function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail
 % tail              = Specify the tail of the distribution. 'left','right' (use one sided T-tests)
 %                       or 'both' (use F-test).
 % alpha             = Significance level for the confidence interval.
+% scaleMode             = Scaling mode for the delta (RAW,INTERCEPT, RANDOMSTD;
+%                       see lm.scaleFactor)
 %
 % OUTPUT
 % p                 = The p-value associated with the test. (see coefTest)
@@ -44,16 +46,18 @@ function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail
 % BK -  Jan 2021
 % Mar 2021- rewrote to use lm.contrast
 nin =nargin;
-if nin <6
-    alpha = 0.05;
-    if nin <5
-        tail = 'both';
-        if nin <4
-            predictedDelta = 0;
+if nin<7
+    scaleMode = 'RAW';
+    if nin <6
+        alpha = 0.05;
+        if nin <5
+            tail = 'both';
+            if nin <4
+                predictedDelta = 0;
+            end
         end
     end
 end
-
 %% Determine the estimate using the linear model FE
 if isnumeric(A)
     if nin < 3
@@ -104,18 +108,22 @@ switch upper(tail)
         error('%s is not a valid tail specification',tail);
 end
 
+%% Scalnig
+[scale,units] = lm.scaleFactor(m,scaleMode);
+delta = delta/scale;
+
 %% Alpha CI
 if nargout > 4
     % Compute 1-alpha point estmate confidence intervals, only if requested .
-    cov  = c*m.CoefficientCovariance*c';    
+    cov  = c*m.CoefficientCovariance*c';
     criterion = tinv(1-alpha/2,m.DFE);
-    updown= criterion.*sqrt(cov);
+    updown= criterion.*sqrt(cov)/scale;
     CI = [delta - updown, delta + updown];
 end
 
 if nargout > 5
     % Report string
-    str = sprintf('%s(%d) = %.3f, p= %.g, delta= %.1f ms (%d%% CI [%.1f %.1f])\n',statName,df,stat,p,delta,100*(1-alpha),CI);
+    str = sprintf(['%s(%d) = %.3g, p= %.3g, delta= %.3g' units ' (%d%% CI [%.3g %.3g])'],statName,df,stat,p,delta,100*(1-alpha),CI);
 end
 
 end
