@@ -207,7 +207,7 @@ if hasRandomEffects
     eq6  = [eq6 '+' p.Results.randomEffects];
 end
 
-% Computer in a sub to simplify bootstratpping
+% Compute in a sub to simplify bootstratpping
 [results.a,results.b,results.c,results.cPrime,results.ab,results.kappa2,results.moderatorValues, results.style, results.rho, results.lm6] = locRegression(T,eq4,eq5,eq6,p.Results.treatment,mediators,p.Results.moderator,p.Results.dummyVarCoding,p.Results.alpha);
 %% Boostrap confidence limits by resampling the rows in T (trials, presumably)
 if hasModerator
