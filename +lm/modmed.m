@@ -108,7 +108,7 @@ p.addParameter('outcome','',@ischar);
 p.addParameter('treatment','',@ischar);
 p.addParameter('mediator','',@(x) ischar(x) || iscellstr(x) || isstring(x));
 p.addParameter('moderator','',@ischar);
-p.addParameter('nuisance','',@ischar);
+p.addParameter('nuisance','',@(x) (isempty(x) || ischar(x)));
 p.addParameter('randomEffects','',@ischar);
 p.addParameter('alpha',0.05,@isnumeric);
 p.addParameter('dummyVarCoding','effects',@ischar);
