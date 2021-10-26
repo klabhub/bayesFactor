@@ -112,7 +112,7 @@ function TX= fillTable(m,X)
                 case 'categorical'
                     value = varRange{i}(1); % First in range is the default
                 otherwise
-                    error('Non categorical variables... not sure what to do here...');
+                    error('Non categorical variable (%s)... not sure what to do here...',varNames{i});
             end
         end
         TX.(varNames{i}) =value;
