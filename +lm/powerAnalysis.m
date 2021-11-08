@@ -81,7 +81,7 @@ nrEquivalenceTests= size(equivalence,1);
 nrEquivalenceTestsHack = max(1,nrEquivalenceTests);
 anovaTerm = p.Results.anovaTerm;
 mcp = p.Results.multipleComparisonsProcedure;
-nrAnovaTerms = size(anovaTerm ,1);
+nrAnovaTerms = numel(anovaTerm);
 nrAnovaTermsHack = max(nrAnovaTerms,1);
 uSubjectID = unique(m.Variables.(subjectVariable));
 nrSubjectsAvailable  = numel(uSubjectID);
@@ -161,7 +161,7 @@ end
 mcpfun = @multicomp; % Hack to use the nested function in the parfor using feval
 
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
-      %for i=1:nrMonteCarlo  % For debugggin without parfor
+    %for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN
         
         % Generate surrogate data based on the model
@@ -184,6 +184,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
             elseif isa(m,'GeneralizedLinearMixedModel')
                 ysim    = random(slme,[],X,Z,offset,weights,ntrials);
             else 
+                ysim = []; %#ok<NASGU> %Needed to avoid parfor warning
                 error('Unknown model type');
             end
             simResponse= NaN(length(subset),1);
@@ -233,7 +234,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
                 break;
             else
                 thisAnova = anova(lmSim);
-                stay = strcmp(anovaTerm{a,:},thisAnova.Term); %#ok<PFBNS>
+                stay = strcmp(anovaTerm{a},thisAnova.Term); %#ok<PFBNS>
                 anovaIsSig(a,n,i) = thisAnova.pValue(stay)<alpha;
             end
         end
@@ -268,9 +269,9 @@ end
 
 close(hWaithBar);
 
-anovaPower = nanmean(anovaIsSig,3)';
-contrastPower = nanmean(contrastIsSig,3)';
-equivalencePower = nanmean(equivalenceIsSig,3)';
+anovaPower = mean(anovaIsSig,3,'omitnan')';
+contrastPower = mean(contrastIsSig,3,'omitnan')';
+equivalencePower = mean(equivalenceIsSig,3,'omitnan')';
 
 
 h=[];
