@@ -565,7 +565,7 @@ else
             bLim = [-1 1].* sqrt(sxx*syy-syx^2)/sqrt(sxx*smm-smx^2);
             extremeA = aLim(sign(aLim)==sign(a(i)));
             extremeB = bLim(sign(bLim)==sign(b(i)));
-            kappa2(i,mo) = a(i).*b(i)./(extremeA*extremeB);
+            kappa2(i) = a(i).*b(i)./(extremeA*extremeB);
         end
     end
 end
