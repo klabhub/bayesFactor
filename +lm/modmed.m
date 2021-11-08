@@ -247,13 +247,15 @@ if hasModerator
 else
     nrModeratorValues= 1;
 end
-if p.Results.bootstrap>0
-    bsA = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
-    bsB =  nan([nrMediators nrModeratorValues p.Results.bootstrap]);
-    bsC = nan([1 nrModeratorValues p.Results.bootstrap]);
-    bsCPrime = nan([1, nrModeratorValues p.Results.bootstrap]);
-    bsKappa2 = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
-    bsAB = nan([nrMediators nrModeratorValues p.Results.bootstrap]);
+nrBs = p.Results.bootstrap;
+if nrBs>0
+
+    bsA = nan([nrMediators nrModeratorValues nrBs]);
+    bsB =  nan([nrMediators nrModeratorValues nrBs]);
+    bsC = nan([1 nrModeratorValues nrBs]);
+    bsCPrime = nan([1, nrModeratorValues nrBs]);
+    bsKappa2 = nan([nrMediators nrModeratorValues nrBs]);
+    bsAB = nan([nrMediators nrModeratorValues nrBs]);
     treatment = p.Results.treatment;
     moderator= p.Results.moderator;
     dummyVarCoding=p.Results.dummyVarCoding;
@@ -265,12 +267,16 @@ if p.Results.bootstrap>0
         uGrpT = NaN; % Not used but parfor wants this defined.
     end
 
-    % Use a dataqueue to show progress updates
-    %wBar = pWaitBar(p.Results.bootstrap,sprintf('Bootstrap for %s', eq6));
+   % Use a dataqueue to show progress updates
+   dataQueue = parallel.pool.DataQueue;
+   hWaithBar = waitbar(0,'Mediation bootstrapping');
+    cntr =0;
+    
 
+    afterEach(dataQueue,@updateWaitBar);
 
-    parfor (bs = 1:p.Results.bootstrap, p.Results.nrWorkers)
-    %for (bs = 1:p.Results.bootstrap)
+    parfor (bs = 1:nrBs, p.Results.nrWorkers)
+    %for (bs = 1:nrBs)
         if isempty(groupResampling)
             % Resample rows (trials probably) with replacement
             ix= randi(height(T),height(T),1);
@@ -282,10 +288,11 @@ if p.Results.bootstrap>0
             thisT = innerjoin(thisGrpT,T,'Keys',groupResampling);
         end
         [bsA(:,:,bs),bsB(:,:,bs),bsC(:,:,bs),bsCPrime(:,:,bs),bsAB(:,:,bs),bsKappa2(:,:,bs)] = locRegression(thisT,eq4,eq5,eq6,treatment,mediators,moderator,dummyVarCoding,alpha,keepMediator);
-        % Update the waitbar 
-        %increment(wBar,bs);
+        % Update the waitbar      
+        send(dataQueue,bs);
     end
-    %clear wBar;
+    close(hWaithBar);
+
     % Determine specified percentiles
     confLimits = 100*[p.Results.alpha/2 1-p.Results.alpha/2];
     results.clim.a = prctile(bsA,confLimits,3);
@@ -295,7 +302,7 @@ if p.Results.bootstrap>0
     results.clim.kappa2 = prctile(bsKappa2,confLimits,3);
     results.clim.ab = prctile(bsAB,confLimits,3);
     % And store a range of percentiles just in case...
-    step = 100/(p.Results.bootstrap/10); % 1% bins for 1000 bs, 0.1% for 10000
+    step = 100/(nrBs/10); % 1% bins for 1000 bs, 0.1% for 10000
     bins = 0:step:100;
     results.bs.bins = bins;
     results.bs.a =prctile(bsA,bins,3);
@@ -304,21 +311,20 @@ if p.Results.bootstrap>0
     results.bs.cPrime =prctile(bsCPrime,bins,3);
     results.bs.kappa2 =prctile(bsKappa2,bins,3);
     results.bs.ab =prctile(bsAB,bins,3);
+
+
 else
     results.clim = [];
 end
 results.parms = p.Results;
 
+    function updateWaitBar(~)
+        cntr=  cntr+1;
+        waitbar(cntr/nrBs,hWaithBar);
+    end
+
 end
-
-function updateWaitBar(reset,total,hWaitBar)
-        persistent cntr
-        if isempty(cntr);cntr=1;end
-        if reset==0;cntr=1;end
-        waitbar(cntr/total,hWaitBar);
-end
-
-
+    
 %%
 function [a,b,c,cPrime,ab,kappa2,moderatorLevels,style,rho,lm6] = locRegression(T,eq4,eq5,eq6,treatment,mediators,moderator,dummyVar,alpha,keepMediator)
 %% Fit the linear models and extract betas and p-valus using the nomenclature of the paper.
