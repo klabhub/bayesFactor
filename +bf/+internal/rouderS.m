@@ -15,6 +15,10 @@ function value= rouderS(g,y,X,grouping,continuousIx,options)
 if ~isempty(continuousIx)
     contX = X(:,continuousIx);
     contGMatrix = inv(contX'*contX/N);
+else
+    % Even though this will never be used, the parfor loop will fail
+    % if this matrix is not defined
+    contGMatrix = nan; 
 end
 
 % NOTE It would be nice to evaluate this on a GPU but the builtin gpuArray
