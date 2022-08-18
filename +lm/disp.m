@@ -72,7 +72,15 @@ for f=1:numel(factors)
     elms = strsplit(factor,':');
     nrElms =numel(elms);
     for e=1:nrElms
-        if m.VariableInfo{elms{e},'IsCategorical'}
+        if strcmpi(elms{e},'(Intercept)')
+            % not in variable info (and not categorical, so continue
+            elms{e} = '\(Intercept\)';
+            if strcmpi(showEffects,'Intercept')
+                % Revert to RAW scaling for the intercept itself.
+                scale = 1;
+                units = '';
+            end
+        elseif m.VariableInfo{elms{e},'IsCategorical'}
             elms{e} = [elms{e} '_[^:]+'];
         end
         if nrElms>1 && e <nrElms

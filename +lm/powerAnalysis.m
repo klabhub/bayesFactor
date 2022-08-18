@@ -7,6 +7,10 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 % Parm/Value pairs:
 % subjectVariable  - the name of the variable in the lm that contains the
 % subject  ID. [subject].
+% betweenSubjectVariable - The name of the variable that identifies the
+% group for a between subject design. ['']. If this is specified,
+% simulations will pick the same nrSubjects from each group identified by
+% this variable. 
 % nrSubjects: speciy the vector of subject sample sizes to investigate
 % nrMonteCarlo -  MC simulations per sample size. [100]
 % alpha - significance level
@@ -24,7 +28,8 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 %                                                           (multiple) contrasts and equivalences
 % Power Analysis will be done for the following model terms:
 % anovaTerm - Cell array with anova terms
-% contrast  - Matrix with specific model contrasts (see lm.posthoc or coefTest how to specify contrasts)
+% contrast  - Cell array in which each row specifies a specific contrast to probe. (see lm.posthoc or
+% coefTest how to specify contrasts). 
 % equivalence - Cell array where each row defines an equivalence test
 %               {A,B,bounds}; see lm.tost
 % nrWorkers = The number of workers for parfor [0]
@@ -46,6 +51,7 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 p=inputParser;
 p.addRequired('lm',@(x) (isa(x,'GeneralizedLinearMixedModel') || isa(x,'LinearMixedModel')))
 p.addParameter('subjectVariable','subject',@ischar);
+p.addParameter('betweenSubjectsVariable','',@ischar);
 p.addParameter('nrSubjects',10,@isnumeric);
 p.addParameter('nrMonteCarlo',100,@isnumeric);
 p.addParameter('alpha',0.05,@isnumeric); % Significance level
@@ -150,6 +156,8 @@ Z = slme.Z.*randomEffectsScale; % Random effects
 if isa(m,'LinearMixedModel')
     weights = modelStruct.ObservationInfo.Weights;
     weights = weights(subset);
+    offset = NaN; % Not used but have to define parfor
+    ntrials = NaN;
 elseif isa(m,'GeneralizedLinearMixedModel')
     weights     = slme.PriorWeights;
     offset    = slme.Offset;
@@ -162,15 +170,26 @@ mcpfun = @multicomp; % Hack to use the nested function in the parfor using feval
 
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
     %for i=1:nrMonteCarlo  % For debugggin without parfor
-    for n=1:nrN
-        
+    for n=1:nrN        
         % Generate surrogate data based on the model
-        subjectsToKeep = randi(nrSubjectsAvailable,[nrSubjectsToSimulate(n) 1]); %#ok<PFBNS> % Sample subjects with replacement
-        nrSims = ceil(nrSubjectsToSimulate(n)/nrSubjectsAvailable);
+        if isempty(p.Results.betweenSubjectsVariable)
+            % Within subjects design, just pick subjects from the pool
+            subjectsToKeep = randi(nrSubjectsAvailable,[nrSubjectsToSimulate(n) 1]); %#ok<PFBNS> % Sample subjects with replacement                        
+        else
+            % A design with one between subjects variable; make sure to sample equally from each group (
+            % nrSubjectsToSimulate is now interpreted as N per group.
+            betweenSubjects = m.Variables.(p.Results.betweenSubjectsVariable);
+            subjectsToKeep =[];
+            for u=unique(betweenSubjects)'
+                thisSubjects = unique(m.Variables.(subjectVariable)(ismember(betweenSubjects,u)));
+                thisSubjectsToKeep = thisSubjects(randi(numel(thisSubjects),[nrSubjectsToSimulate(n) 1]));
+                subjectsToKeep = [subjectsToKeep,thisSubjectsToKeep];                % Each column a group
+            end
+        end
         nrSubjectsSoFar = 0;
         simT= table; % Start with empty table
         subjectNr = 0;
-        for s = 1:nrSims
+        while nrSubjectsSoFar < nrSubjectsToSimulate(n)
             % For each s we generates the same number of responses as in the original data.
             % The builtin random function generates random effects as well
             % as error on each call. So these are "new" subjects.
@@ -190,23 +209,19 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
             simResponse= NaN(length(subset),1);
             simResponse(subset) = ysim;
             
-            % Use what we need, while making sure to sample a complete "data set" for each subject.
-            if s==nrSims
-                nrSubjectsNow = nrSubjectsToSimulate(n)- nrSubjectsSoFar;
-            else
-                % All
-                nrSubjectsNow = nrSubjectsAvailable;
-            end
-            thisSubjects = subjectsToKeep(nrSubjectsSoFar+(1:nrSubjectsNow));
-            nrSubjectsSoFar= nrSubjectsSoFar+nrSubjectsNow;
-            for sub = uSubjectID(thisSubjects)'  %#ok<PFBNS>
+            from = nrSubjectsSoFar+1;
+            to = min(size(subjectsToKeep,1),nrSubjectsToSimulate(n));
+
+            thisSubjects = subjectsToKeep(from:to,:);
+            nrSubjectsSoFar= nrSubjectsSoFar+size(thisSubjects,1);
+            for sub = uSubjectID(thisSubjects(:))'  %#ok<PFBNS>
                 keep = ismember(m.Variables.(subjectVariable),sub);
                 thisSim = m.Variables(keep,:);
                 thisSim.(m.ResponseName) = simResponse(keep);
                 % Assign a new ID to each subject
                 thisSim.(subjectVariable) = repmat(categorical(subjectNr),[sum(keep) 1]);
                 subjectNr = subjectNr +1;
-                simT = [simT; thisSim];
+                simT = [simT; thisSim]; %#ok<AGROW> 
             end
         end
         if ~isempty(qcFunction)
@@ -304,7 +319,7 @@ if p.Results.graph
                 h = [h  plot(iSubjects,iPower(:,j),'LineWidth',2,'Color',hE(j).Color)];             %#ok<AGROW>
             end
         end
-        xlabel '#Subjects'
+        xlabel (['# ' subjectVariable 's'])
         ylabel 'Power'
         set(gca,'YLim',[0 1],'XTick',nrSubjectsToSimulate)
     end
