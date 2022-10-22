@@ -1,6 +1,6 @@
 function [v,TA,TB] = contrast(m,A,B,defineDifference,scale)
 % Specify two conditions A and B using cell arrays of parm/value pairs to
-% retreive the contrast weights vector A-B.
+% retrieve the contrast weights vector A-B.
 %
 % INPUT
 % m - The linear model
@@ -24,6 +24,7 @@ if nargin<5
         defineDifference =true;
     end
 end
+assert(islogical(scale)&& islogical(defineDifference),"scale and defineDifference parameters should be logical values");
 
 import lm.*
 if isa(A,'double') && isa(B,'double')
@@ -97,20 +98,25 @@ if scale
 end
 end
 
-function TX= fillTable(m,X)
+function TX= fillTable(m,propValSpecs)
+    % Provide a linear model  (m) and a cell array specifying
+    % property/value pairs that define a condition (i.e., one side of the
+    % contrast)
     varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
     varNames = m.VariableNames(m.VariableInfo.InModel);
     varRange =m.VariableInfo.Range(m.VariableInfo.InModel);
     nrVars= numel(varTypes);
     TX = table('Size',[1 nrVars],'VariableType',varTypes,'VariableNames',varNames);
     for i=1:nrVars
-        [tf,ix] =ismember(varNames{i},X(1:2:end));
+        [tf,ix] =ismember(varNames{i},propValSpecs(1:2:end));
         if tf
-            value = X{2*ix};
+            value = propValSpecs{2*ix};
         else
             switch (varTypes{i})
                 case 'categorical'
                     value = varRange{i}(1); % First in range is the default
+                case 'double'
+                    value = 0; % A continuous variable that was not specified in the contrast (not in X) - set to zero 
                 otherwise
                     error('Non categorical variable (%s)... not sure what to do here...',varNames{i});
             end

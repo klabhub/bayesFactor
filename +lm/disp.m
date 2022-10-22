@@ -1,4 +1,4 @@
-function disp(m,factors,showEffects,tol)
+function out = disp(m,factors,showEffects,tol)
 % Convenience disp function to show Anova results of a linear model in
 % standard notation for easy copy and paste.
 %
@@ -15,7 +15,7 @@ function disp(m,factors,showEffects,tol)
 %                       'RAW' - do not scale
 % tol = Tolerance for partial eta squared confidence intervals
 % OUTPUT
-% output is written to the command line only.
+% out = the string that is also written to the command line .
 %
 % BK - Feb 2020
 if nargin<2 || isempty(factors)
@@ -29,6 +29,9 @@ if islogical(showEffects)
 end
 if nargin <4
     tol =0.001;
+end
+if nargout>0
+    out = '';
 end
 
 if ischar(factors)
@@ -107,6 +110,8 @@ for f=1:numel(factors)
     end
     
     fprintf(style,[fmt '\n'],vars{:});
-    
+    if nargout>0
+        out = char(out,sprintf([fmt '\n'],vars{:}));
+    end
 end
 end
