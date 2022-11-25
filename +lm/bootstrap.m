@@ -145,12 +145,17 @@ if strcmpi(mode,'FITPLUSNOISE')
     [~,~,responseGroupingIx]  = histcounts(response,bins);
     % Kernel density estimate per bin
     noiseDistribution  = fitdist(m.residuals,'kernel','kernel','epanechnikov','By',responseGroupingIx);    
+else
+    % Not usedm but need to be defined for parfor
+    responseGroupingIx=[];
+    noiseDistribution  =[] ; 
+    response =[];
 end
 
 parfor (i=1:nrMonteCarlo ,nrWorkers )
 % for i=1:nrMonteCarlo % Use this when debugging
     switch upper(mode)
-        case 'RESAMPLING'
+        case 'RESAMPLE'
             % Select random subset of subjects with resampling and same total
             % number.
             subjectsToUse = uSubjects(randi(nrSubjects,[nrSubjects 1]));
@@ -179,6 +184,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers )
             % Cannot get here, but without it parfor parsing gets confused
             % about setT.
             setT = [];
+            erorr('???')
     end   
     % Estimate model parameters based on the current set.
     if isa(m,'GeneralizedLinearMixedModel')
