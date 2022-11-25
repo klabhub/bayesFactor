@@ -248,7 +248,7 @@ if p.Results.graph
     if strcmpi(mode,'FITPLUSNOISE')
         % Show the residuals and how they are fit by the kernel density
         ax(nrFixedEffects+2) =nexttile;
-        maxResidual = max(abs(m.residuals));       
+        maxResidual = prctile(abs(m.residuals),97.5);       
         nrBins = round(numel(m.residuals)/10);
         x= linspace(-maxResidual,maxResidual,nrBins);
         hold on
@@ -259,12 +259,13 @@ if p.Results.graph
         nrColors = size(axColors,1);
         for b=1:nrHeteroBins
             thisGroup = responseGroupingIx==b;
-            h = histogram(R(thisGroup),nrBins,'Normalization','Probability');       
+            h = histogram(R(thisGroup),x,'Normalization','Probability');       
             thisColor = axColors(mod(b-1,nrColors)+1,:);
             h.FaceColor = thisColor;
             thisPdf =pdf(noiseDistribution{b},x);
             plot(x,thisPdf./sum(thisPdf),'LineWidth',2,'color',thisColor) 
         end
+        xlim(maxResidual*[-1 1])
         xlabel 'Residual'
         ylabel 'Probability'
         legend('Residuals','Kernel Density Estimate')
