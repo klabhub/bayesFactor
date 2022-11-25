@@ -1,4 +1,4 @@
-function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnalysis(m,varargin)
+function [anovaPower,contrastPower,equivalencePower,deltaContrast,h,fixedEffects,randomEffects] = powerAnalysis(m,varargin)
 % Simulate a linear mixed model to generate a power analysis for factors in
 % the model, specific posthoc contrasts, or tests of equivalence.
 %
@@ -45,7 +45,10 @@ function [anovaPower,contrastPower,equivalencePower,deltaContrast,h] = powerAnal
 % contrastPower - Power for each row specified in contrast
 % equivalencePower - Power for reach row in equivalence
 % deltaContrast - Actual delta computed for each contrast .
-%
+% fixedEffects - [nrFixedEffects nrMonteCarlo] array of fixed effect
+%                   estimates from each of the MC simulations
+% ranodomEffects - [nrRandomEffects nrMonteCarlo] array of random effect
+%                   estimates from each of the MC simulations
 % BK -Dec 2020
 
 p=inputParser;
@@ -74,6 +77,8 @@ if any(m.ObservationInfo.Excluded)
 end
 
 dummyVarCoding = lm.dummyVarCoding(m);
+nrFixedEffects = size(m.fixedEffects,1);
+nrRandomEffects =  size(m.randomEffects,1);
 % Extract from p to avoid broadcasting and initialize outputs
 alpha = p.Results.alpha;
 maxLossToQc = p.Results.maxLossToQc;
@@ -98,6 +103,8 @@ anovaIsSig= nan(nrAnovaTerms,nrN,p.Results.nrMonteCarlo);
 contrastIsSig= nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 deltaContrast = nan(nrContrasts,nrN,p.Results.nrMonteCarlo);
 equivalenceIsSig = nan(nrEquivalenceTests,nrN,p.Results.nrMonteCarlo);
+fixedEffects = nan(nrFixedEffects,nrN,p.Results.nrMonteCarlo);
+randomEffects = nan(nrRandomEffects,nrN,p.Results.nrMonteCarlo);
 qcFunction  =p.Results.qcFunction;
 nrRandomEffects = numel(m.randomEffects);
 if ~isempty(p.Results.sesoi)
@@ -277,6 +284,10 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
         end        
         equivalenceIsSig(:,n,i) = feval(mcpfun,thisEqP,alpha,mcp); %#ok<FVAL>
         
+        % Store the fixed and random effects
+        fixedEffects(:,n,i) = lmSim.fixedEffects;
+        randomEffects(:,n,i) = lmSim.randomEffects;
+
         % Update the data queue
         send(dataQueue,(n-1)+i);
     end
