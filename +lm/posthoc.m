@@ -45,6 +45,12 @@ function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail
 %
 % BK -  Jan 2021
 % Mar 2021- rewrote to use lm.contrast
+
+
+nrContrast = size(A,1);
+
+
+
 nin =nargin;
 if nin<7
     scaleMode = 'RAW';
@@ -53,11 +59,28 @@ if nin<7
         if nin <5
             tail = 'both';
             if nin <4
-                predictedDelta = 0;
+                predictedDelta = zeros(nrContrast,1);
             end
         end
     end
 end
+
+if nrContrast>1
+    % Recursively call this function for each row in the contrast.
+    p = nan(nrContrast,1);
+    stat =nan(nrContrast,1);
+    df =nan(nrContrast,1);
+    delta =nan(nrContrast,1);
+    CI =nan(nrContrast,2);
+    str =cell(nrContrast,1);
+    debugStr =cell(nrContrast,1);
+    for i=1:nrContrast
+        [p(i),stat(i),df(i),delta(i),CI(i,:),str{i},c(i,:),debugStr{i}] = lm.posthoc(m,A(i,:),B(i,:),predictedDelta(i),tail,alpha,scaleMode); %#ok<AGROW>
+    end
+    return;
+end
+
+
 %% Determine the estimate using the linear model FE
 if isnumeric(A)
     if nin < 3
@@ -68,7 +91,6 @@ else
     c  = lm.contrast(m,A,B); % the linear contrast
 end
 
-nrContrasts = size(c,1);
 
 if isa(m,'LinearModel')
     delta  =c*m.Coefficients.Estimate;
@@ -96,16 +118,13 @@ switch upper(tail)
         [p,stat,~,df] = coefTest(m,c,predictedDelta);
         statName= 'F';
     case {'LEFT','RIGHT'}
-        p = nan(nrContrasts,1);
-        for row=1:nrContrasts
-            cov  = c(row,:)*m.CoefficientCovariance*c(row,:)';
-            stat = (delta-predictedDelta)/sqrt(cov);
-            df  =  m.DFE;
-            if strcmpi(tail,'LEFT')
-                p(row) = tcdf(stat,m.DFE);
-            else
-                p(row) = 1-tcdf(stat,m.DFE);
-            end
+        cov  = c*m.CoefficientCovariance*c';
+        stat = (delta-predictedDelta)/sqrtm(cov);% Use sqrtm for more stability (less speed)
+        df  =  m.DFE;
+        if strcmpi(tail,'LEFT')
+            p = tcdf(stat,m.DFE);
+        else
+            p = 1-tcdf(stat,m.DFE);
         end
         statName= 'T';
     otherwise
@@ -118,21 +137,16 @@ delta = delta/scale;
 
 %% Alpha CI
 if nargout > 4
-    % Compute 1-alpha point estmate confidence intervals, only if requested
-    % 
-    
-    CI = nan(nrContrasts,2);
-    for row = 1:nrContrasts
-        cov  = c(row,:)*m.CoefficientCovariance*c(row,:)';
-        criterion = tinv(1-alpha/2,m.DFE);
-        updown= criterion.*sqrt(cov)/scale;
-        CI(row,:) = [delta(row) - updown, delta(row) + updown];
-    end
+    % Compute 1-alpha point estmate confidence intervals, only if requested .
+    cov  = c*m.CoefficientCovariance*c';
+    criterion = tinv(1-alpha/2,m.DFE);
+    updown= criterion.*sqrtm(cov)/scale; % Use sqrtm for more stability (less speed)
+    CI = [delta - updown, delta + updown];
 end
 
 if nargout > 5
     % Report string
-    str = sprintf(['%s(%d) = %.3g, p= %.3g, delta= %.3g' units ' (%d%% CI [%.3g %.3g])'],statName,df,stat,p,mean(delta,1),100*(1-alpha),mean(CI,1));
+    str = sprintf(['%s(%d) = %.3g, p= %.3g, delta= %.3g' units ' (%d%% CI [%.3g %.3g])'],statName,df,stat,p,delta,100*(1-alpha),CI);
 end
 
 end
