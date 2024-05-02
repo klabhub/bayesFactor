@@ -68,6 +68,7 @@ else
     c  = lm.contrast(m,A,B); % the linear contrast
 end
 
+nrContrasts = size(c,1);
 
 if isa(m,'LinearModel')
     delta  =c*m.Coefficients.Estimate;
@@ -95,13 +96,16 @@ switch upper(tail)
         [p,stat,~,df] = coefTest(m,c,predictedDelta);
         statName= 'F';
     case {'LEFT','RIGHT'}
-        cov  = c*m.CoefficientCovariance*c';
-        stat = (delta-predictedDelta)/sqrt(cov);
-        df  =  m.DFE;
-        if strcmpi(tail,'LEFT')
-            p = tcdf(stat,m.DFE);
-        else
-            p = 1-tcdf(stat,m.DFE);
+        p = nan(nrContrasts,1);
+        for row=1:nrContrasts
+            cov  = c(row,:)*m.CoefficientCovariance*c(row,:)';
+            stat = (delta-predictedDelta)/sqrt(cov);
+            df  =  m.DFE;
+            if strcmpi(tail,'LEFT')
+                p(row) = tcdf(stat,m.DFE);
+            else
+                p(row) = 1-tcdf(stat,m.DFE);
+            end
         end
         statName= 'T';
     otherwise
@@ -114,16 +118,21 @@ delta = delta/scale;
 
 %% Alpha CI
 if nargout > 4
-    % Compute 1-alpha point estmate confidence intervals, only if requested .
-    cov  = c*m.CoefficientCovariance*c';
-    criterion = tinv(1-alpha/2,m.DFE);
-    updown= criterion.*sqrt(cov)/scale;
-    CI = [delta - updown, delta + updown];
+    % Compute 1-alpha point estmate confidence intervals, only if requested
+    % 
+    
+    CI = nan(nrContrasts,2);
+    for row = 1:nrContrasts
+        cov  = c(row,:)*m.CoefficientCovariance*c(row,:)';
+        criterion = tinv(1-alpha/2,m.DFE);
+        updown= criterion.*sqrt(cov)/scale;
+        CI(row,:) = [delta(row) - updown, delta(row) + updown];
+    end
 end
 
 if nargout > 5
     % Report string
-    str = sprintf(['%s(%d) = %.3g, p= %.3g, delta= %.3g' units ' (%d%% CI [%.3g %.3g])'],statName,df,stat,p,delta,100*(1-alpha),CI);
+    str = sprintf(['%s(%d) = %.3g, p= %.3g, delta= %.3g' units ' (%d%% CI [%.3g %.3g])'],statName,df,stat,p,mean(delta,1),100*(1-alpha),mean(CI,1));
 end
 
 end

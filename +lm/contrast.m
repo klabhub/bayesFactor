@@ -102,6 +102,7 @@ function TX= fillTable(m,propValSpecs)
     % Provide a linear model  (m) and a cell array specifying
     % property/value pairs that define a condition (i.e., one side of the
     % contrast)
+    dvCoding = lm.dummyVarCoding(m);
     varTypes  = m.VariableInfo.Class(m.VariableInfo.InModel);
     varNames = m.VariableNames(m.VariableInfo.InModel);
     varRange =m.VariableInfo.Range(m.VariableInfo.InModel);
@@ -114,7 +115,10 @@ function TX= fillTable(m,propValSpecs)
         else
             switch (varTypes{i})
                 case {'categorical','string'}
-                    value = varRange{i}(1); % First in range is the default
+                    if ~strcmpi(dvCoding,'Reference')
+                        error('lm.contrast/fillTable only works for reference coded models.')
+                    end
+                    value = varRange{i}(1); % Use first in range as the default   - this only works for reference coding                  
                 case 'double'
                     value = 0; % A continuous variable that was not specified in the contrast (not in X) - set to zero 
                 otherwise
