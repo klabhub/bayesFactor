@@ -1,4 +1,4 @@
-function dispCompare(c)
+function out= dispCompare(c)
 % Pretty print the results of the output of the compare function for a
 % generalized linear mixed model.
 % The line will include the change in AIC in the second compared to the
@@ -15,6 +15,10 @@ if c.pValue(2)<0.05
 else
     second='';first='*';
 end
-fprintf('%s%s%s vs %s%s%s dAIC %d (X2 (%d) = %3.3f, p= %3.3g)\n',first,c.Model(1),first,second,c.Model(2),second,round(diff(c.AIC)),c.deltaDF(2),c.LRStat(2),c.pValue(2));
+str= sprintf('%s%s%s vs %s%s%s dAIC %d (X2 (%d) = %3.3f, p= %3.3g)\n',first,c.Model(1),first,second,c.Model(2),second,round(diff(c.AIC)),c.deltaDF(2),c.LRStat(2),c.pValue(2));
+if nargout ==0
+    fprintf(str);
+else
+    out = str;
 end
  

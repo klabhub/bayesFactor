@@ -122,7 +122,9 @@ dummyVarCoding = lm.dummyVarCoding(m);
 nrFixedEffects  = size(m.fixedEffects,1);
 nrRandomEffects =  size(m.randomEffects,1);
 fixedEffects    = nan(nrFixedEffects,nrMonteCarlo);
+fixedEffectsIsSignificant= nan(nrFixedEffects,nrMonteCarlo);
 randomEffects   = nan(nrRandomEffects,nrMonteCarlo);
+
 loglike         = nan(1,nrMonteCarlo); % Log likelihood.
 
 % Use a dataqueue to show progress updates
@@ -195,6 +197,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers )
 
     % Store the fixed and random effects
     fixedEffects(:,i) = thisM.fixedEffects;
+    fixedEffectsIsSignificant(:,i) = thisM.Coefficients.pValue < p.Results.alpha;
     randomEffects(:,i) = thisM.randomEffects;
     loglike(i) = thisM.ModelCriterion.LogLikelihood;
     % Update the data queue
@@ -205,16 +208,21 @@ close(hWaithBar);
 fe.mean = mean(fixedEffects,2);
 fe.std = std(fixedEffects,0,2);
 fe.ci   = [prctile(fixedEffects',p.Results.alpha/2);prctile(fixedEffects',1-p.Results.alpha/2)]';
-fe.significanceMatch = -ones(nrFixedEffects,1);
-isSignificant = m.Coefficients.pValue<p.Results.alpha;
-fe.significanceMatch(isSignificant) = double(prod(fe.ci(isSignificant,:),2) >0); 
 fe.all = fixedEffects;
+fe.mismatch = (fe.mean-m.fixedEffects)./m.fixedEffects;
+% For significant FE, calculate the fraction of sets with non-significant effects
+isSignificant = m.Coefficients.pValue < p.Results.alpha;
+fe.pTypeII = nan(nrFixedEffects,1);
+fe.pTypeII(isSignificant) = mean(~fixedEffectsIsSignificant(isSignificant,:),2);
+% And the fraction in which the FE flips sign (and is significant).
+fe.pFlip = nan(nrFixedEffects,1);
+isFlip = (sign(fe.all).*repmat(sign(m.fixedEffects),[1 nrMonteCarlo])) <0 & fixedEffectsIsSignificant;
+fe.pFlip(isSignificant) = mean(isFlip(isSignificant),2);
+
 re.mean = mean(randomEffects,2);
 re.std = std(randomEffects,0,2);
 re.ci   = [prctile(randomEffects',p.Results.alpha/2);prctile(randomEffects',1-p.Results.alpha/2)]';
 re.all = randomEffects;
-
-
 
 %% Graphical output
 % Plot a histogram of each of the fixed effects plus the log likelihood
@@ -230,8 +238,8 @@ if p.Results.graph
         hold on
         plot(FE(f)*[1 1],ylim,'k','LineWidth',2);
         plot([0 0],ylim,'k','LineWidth',0.5)
-        match = matchLabels{fe.significanceMatch(f)+2};
-        title (sprintf('%s (%s): %.3G CI [%.3G %.3G]',m.CoefficientNames{f},match,fe.mean(f),fe.ci(f,1),fe.ci(f,2)) ,"Interpreter","none");
+      
+        title (sprintf('%s: %.3G CI [%.3G %.3G]',m.CoefficientNames{f},fe.mean(f),fe.ci(f,1),fe.ci(f,2)) ,"Interpreter","none");
         xlabel 'Coefficient'
         ylabel 'Probability'
         xlim(max(abs(xlim))*[-1 1])

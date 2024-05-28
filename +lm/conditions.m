@@ -27,7 +27,7 @@ end
 
 if withGroupingVar
     groupingVars = [m.Formula.GroupingVariableNames{:}];
-    for i=1:numel(groupingVars)
+    for i=1:numel(groupingVars)        
         T = addvars(T,categorical(zeros(height(T),1)),'NewVariableNames',groupingVars{i});
     end
 end

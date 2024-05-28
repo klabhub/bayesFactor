@@ -97,7 +97,7 @@ for f=1:numel(factors)
     % a multilevel categorical factor).
     
     fe = fe(stayFe)/scale;
-    [fe,ix] = max(fe);
+    [fe,ix] = max(fe,[],'ComparisonMethod','abs');
     low = m.Coefficients.Lower(stayFe);
     low = low(ix)/scale;
     up =m.Coefficients.Upper(stayFe);

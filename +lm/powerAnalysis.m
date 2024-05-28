@@ -176,7 +176,7 @@ end
 mcpfun = @multicomp; % Hack to use the nested function in the parfor using feval
 
 parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
-    %for i=1:nrMonteCarlo  % For debugggin without parfor
+   % for i=1:nrMonteCarlo  % For debugggin without parfor
     for n=1:nrN        
         % Generate surrogate data based on the model
         if isempty(p.Results.betweenSubjectsVariable)
@@ -286,7 +286,7 @@ parfor (i=1:nrMonteCarlo ,nrWorkers ) % Parfor for the largest number
         
         % Store the fixed and random effects
         fixedEffects(:,n,i) = lmSim.fixedEffects;
-        randomEffects(:,n,i) = lmSim.randomEffects;
+   %     randomEffects(:,n,i) = lmSim.randomEffects;
 
         % Update the data queue
         send(dataQueue,(n-1)+i);

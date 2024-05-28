@@ -113,7 +113,7 @@ function TX= fillTable(m,propValSpecs)
             value = propValSpecs{2*ix};
         else
             switch (varTypes{i})
-                case {'categorical','string'}
+                case {'categorical','string','char'}
                     value = varRange{i}(1); % First in range is the default
                 case 'double'
                     value = 0; % A continuous variable that was not specified in the contrast (not in X) - set to zero 
