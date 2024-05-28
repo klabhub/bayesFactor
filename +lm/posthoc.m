@@ -45,6 +45,12 @@ function [p,stat,df,delta,CI,str,c,debugStr] = posthoc(m,A,B,predictedDelta,tail
 %
 % BK -  Jan 2021
 % Mar 2021- rewrote to use lm.contrast
+
+
+nrContrast = size(A,1);
+
+
+
 nin =nargin;
 if nin<7
     scaleMode = 'RAW';
@@ -53,11 +59,28 @@ if nin<7
         if nin <5
             tail = 'both';
             if nin <4
-                predictedDelta = 0;
+                predictedDelta = zeros(nrContrast,1);
             end
         end
     end
 end
+
+if nrContrast>1
+    % Recursively call this function for each row in the contrast.
+    p = nan(nrContrast,1);
+    stat =nan(nrContrast,1);
+    df =nan(nrContrast,1);
+    delta =nan(nrContrast,1);
+    CI =nan(nrContrast,2);
+    str =cell(nrContrast,1);
+    debugStr =cell(nrContrast,1);
+    for i=1:nrContrast
+        [p(i),stat(i),df(i),delta(i),CI(i,:),str{i},c(i,:),debugStr{i}] = lm.posthoc(m,A(i,:),B(i,:),predictedDelta(i),tail,alpha,scaleMode); %#ok<AGROW>
+    end
+    return;
+end
+
+
 %% Determine the estimate using the linear model FE
 if isnumeric(A)
     if nin < 3
@@ -96,7 +119,7 @@ switch upper(tail)
         statName= 'F';
     case {'LEFT','RIGHT'}
         cov  = c*m.CoefficientCovariance*c';
-        stat = (delta-predictedDelta)/sqrt(cov);
+        stat = (delta-predictedDelta)/sqrtm(cov);% Use sqrtm for more stability (less speed)
         df  =  m.DFE;
         if strcmpi(tail,'LEFT')
             p = tcdf(stat,m.DFE);
@@ -117,7 +140,7 @@ if nargout > 4
     % Compute 1-alpha point estmate confidence intervals, only if requested .
     cov  = c*m.CoefficientCovariance*c';
     criterion = tinv(1-alpha/2,m.DFE);
-    updown= criterion.*sqrt(cov)/scale;
+    updown= criterion.*sqrtm(cov)/scale; % Use sqrtm for more stability (less speed)
     CI = [delta - updown, delta + updown];
 end
 
