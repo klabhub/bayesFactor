@@ -83,6 +83,8 @@ for f=1:numel(factors)
                 scale = 1;
                 units = '';
             end
+        elseif contains(elms{e},'^')
+            elms{e}= strrep(elms{e},'^','\^');
         elseif m.VariableInfo{elms{e},'IsCategorical'}
             elms{e} = [elms{e} '_[^:]+'];
         end
