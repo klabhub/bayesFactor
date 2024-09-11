@@ -33,37 +33,38 @@ pos= NaN(nrFe,1);
 allFeNames = m.CoefficientNames; %regexprep(lm.CoefficientNames,'_(?<level>[\w\d]+)\>','');
 
 if isa(m,'GeneralizedLinearMixedModel')
-    link  = m.Link.Inverse;
+    unlink  =m.Link.Inverse;
 else
-    link = @(x)(x);
+    unlink = @(x)(x);
 end
 ix = ismember(allFeNames,base);
 trueBaseBeta = sum(coeffs.Estimate(ix));
-trueBaseEstimate=  link(trueBaseBeta);
+trueBaseEstimate=  unlink(trueBaseBeta);
 
 %% Compute
 for i=1:numel(effects)
-     if i==1
-         % Use the base specified in the input argument.
-         baseBeta = trueBaseBeta;
-         baseEstimate = trueBaseEstimate;
-     elseif cumulative
-         % Increase the base to reflect all effects so far.
-         baseBeta = sum(baseBeta+coeffs.Estimate(ix));
-         baseEstimate = thisEstimate;
-     %else  Keep the same base         
-     end
+    baseBeta = trueBaseBeta;
+    if i>1 && cumulative
+        % Add betas that have already been processed
+        stay = ismember(allFeNames,effects(1:i-1));
+        baseBeta = baseBeta + sum(coeffs.Estimate(stay));
+    end
+    baseEstimate = unlink(baseBeta);
+     
 
      % Find the relevant effects 
     ix = ismember(allFeNames,effects{i});
+    assert(any(ix),'%s does not exist in this model',effects{i});
+    
     % Determine model estimates
-    thisUpper = link(baseBeta+coeffs.Upper(ix));
-    thisEstimate = link(baseBeta+coeffs.Estimate(ix));
-    thisLower =  link(baseBeta+coeffs.Lower(ix));
+    thisUpper = unlink(baseBeta+coeffs.Upper(ix));
+    thisEstimate = unlink(baseBeta+coeffs.Estimate(ix));
+    thisLower =  unlink(baseBeta+coeffs.Lower(ix));
     % Compare to base estimate
     delta(i) =  thisEstimate-baseEstimate;
     neg(i)   = thisEstimate-thisLower;
     pos(i)   =  thisUpper-thisEstimate;       
+    
 end
 %% Visualize
 x= 1:nrFe;
@@ -74,9 +75,9 @@ feNames =effects; regexprep(effects,'_(?<level>[\w\d]+)\>','');
 yl = ylim;
 [nudge,ix] = max(abs(yl));
 nudge = 0.1*sign(yl(ix))*nudge;
-text(-0.1,nudge,sprintf('Base (%s) = %f',base,trueBaseEstimate),'HorizontalAlignment','Left','Interpreter','none');
+text(-0.1,nudge,sprintf('Base (%s) = %.2f',base,trueBaseEstimate),'HorizontalAlignment','Left','Interpreter','none');
 ylabel(['\Delta  ' m.ResponseName ])
 set(gca,'XTick',x,'XTickLabel',feNames);
 ax=gca;
-ax.XAxis.TickLabelInterpreter = 'none'
+ax.XAxis.TickLabelInterpreter = 'none';
 end

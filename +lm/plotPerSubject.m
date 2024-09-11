@@ -12,7 +12,7 @@ function [effects,ci] = plotPerSubject(m,pv)
 % ci - table with confidence intervals.
 %
 % BK - Feb 2020.
-arguments 
+arguments
     m (1,1)  % Linear model
     pv.showHistogram (1,1) logical = false  % Histogram of effects across subjects
     pv.showLine (1,1)logical = true         % Line graph of effects for each subject
@@ -43,36 +43,39 @@ for s=subjects'
     try
         % Extract the relevant subset of data for this subjects
         thisT = T(~m.ObservationInfo.Excluded & T.subject==s,:);
-        % We have to order this such that the same variable serves as the
-        % reference/left-out parameter.
-       
-            % Refit for this subject
-            if isa(m,'LinearMixedModel')
-                thisGlm = fitlme(thisT,formula,'FitMethod',m.FitMethod,'DummyVarCoding',dummyVarCoding) ;
-
-            else
-                thisGlm = fitglme(thisT,formula,'FitMethod',m.FitMethod,'Distribution',...
-                    m.Distribution,'Link',m.Link,'DummyVarCoding',dummyVarCoding) ;
+        % Refit for this subject
+        if isa(m,'LinearMixedModel')
+            thisGlm = fitlme(thisT,formula,'FitMethod',m.FitMethod,'DummyVarCoding',dummyVarCoding) ;
+        else
+            lastwarn('')
+            thisGlm = fitglme(thisT,formula,'FitMethod',m.FitMethod,'Distribution',...
+                m.Distribution,'Link',m.Link,'DummyVarCoding',dummyVarCoding) ;
+            [msg,id] = lastwarn;
+            if strcmpi(id,'stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:Message_PLUnableToConverge')
+                lastwarn('')
+                error(msg);
             end
-            fe = thisGlm.fixedEffects;
-            fe(1) =[]; % Remove intercept
-            thisFeNames = thisGlm.CoefficientNames;
-            thisFeNames(1) = [];
-
-            effects = [effects   table(fe,'VariableNames',{['s' char(s)]})]; %#ok<AGROW>
-            ci = [thisGlm.Coefficients.Lower thisGlm.Coefficients.Upper];
-            ci(1,:) = [];
-            cis  = [cis table(ci,'VariableNames',{['s' char(s)]})];%#ok<AGROW>
+        end
         
-            %Sanity check that the order of FE is the same in the per subject and
-            %group model. This can fail if one of the subjects does not
-            % have a complete set of conditions
-            assert(all(strcmpi(feNames,thisFeNames)),'coefficientNames of individual fit NOT matched with group fit! (check ''dummyVarCoding'' settings)');        
+        fe = thisGlm.fixedEffects;
+        fe(1) =[]; % Remove intercept
+        thisFeNames = thisGlm.CoefficientNames;
+        thisFeNames(1) = [];
+
+        effects = [effects   table(fe,'VariableNames',string(s))]; %#ok<AGROW>
+        ci = [thisGlm.Coefficients.Lower thisGlm.Coefficients.Upper];
+        ci(1,:) = [];
+        cis  = [cis table(ci,'VariableNames',string(s))];%#ok<AGROW>
+
+        %Sanity check that the order of FE is the same in the per subject and
+        %group model. This can fail if one of the subjects does not
+        % have a complete set of conditions
+        assert(all(strcmpi(feNames,thisFeNames)),'coefficientNames of individual fit NOT matched with group fit! (check ''dummyVarCoding'' settings)');
     catch me
-        fprintf('perSubject lmm for %s failed on %s (%s)\n',formula,s,me.message)        
+        fprintf('perSubject lmm for %s failed on %s (%s)\n',formula,s,me.message)
         continue
     end
-  
+
 end
 
 %% Visualize the main group and individual results
@@ -81,41 +84,41 @@ nrEffects = height(effects);
 nrRows = sum(pv.showHistogram+pv.showLine);
 
 for e =1:nrEffects
-    if pv.showHistogram    
-    subplot(nrRows,nrEffects,e);
-    % Top row shows histogram of effects
-    histogram(effects{e,2:end});
+    if pv.showHistogram
+        subplot(nrRows,nrEffects,e);
+        % Top row shows histogram of effects
+        histogram(effects{e,2:end});
 
-   
+
     end
 
     if pv.showLine
 
-    subplot(nrRows,nrEffects,e+nrEffects*pv.showHistogram);
-    % Bottom row shows line plots with CI per subject.
-    line(reshape(cis{e,2:end},[2 nrSubjects]),repmat(1:nrSubjects,[2 1]),'Color','k')
-    hold on
-    plot(effects{e,2:end},1:nrSubjects,'k.')
-    line([0 0],[0 nrSubjects])
-    % Show the group effect as a red line
-    line(cis{e,1},0.5+nrSubjects/2*[1 1],'Color','r','LineWidth',2);
-    ylim([0 nrSubjects]);
-    set(gca,'yTickLabels',{})
-    if e==1
-        ylabel 'Subject #'
-        set(gca,'yTick',1:nrSubjects,'ytickLabel',subjects)
-    end
+        subplot(nrRows,nrEffects,e+nrEffects*pv.showHistogram);
+        % Bottom row shows line plots with CI per subject.
+        line(reshape(cis{e,2:end},[2 nrSubjects]),repmat(1:nrSubjects,[2 1]),'Color','k')
+        hold on
+        plot(effects{e,2:end},1:nrSubjects,'k.')
+        line([0 0],[0 nrSubjects])
+        % Show the group effect as a red line
+        line(cis{e,1},0.5+nrSubjects/2*[1 1],'Color','r','LineWidth',2);
+        ylim([0 nrSubjects]);
+        set(gca,'yTickLabels',{})
+        if e==1
+            ylabel 'Subject #'
+            set(gca,'yTick',1:nrSubjects,'ytickLabel',subjects)
+        end
     end
 
-     if prod(sign(cis{e,1})) >0 % CI both <0 or both >0; significant at alpha level.
+    if prod(sign(cis{e,1})) >0 % CI both <0 or both >0; significant at alpha level.
         sigStr = '(*)';
     else
         sigStr = '';
     end
-    t=  title([feNames{e} ': ' num2str(effects{e,1},pv.NUMPRECISION) ' ' sigStr]);  
+    t=  title([feNames{e} ': ' num2str(effects{e,1},pv.NUMPRECISION) ' ' sigStr]);
     t.Interpreter = 'None';
-    
+
     xlabel 'Effect'
-    
+
 end
 
