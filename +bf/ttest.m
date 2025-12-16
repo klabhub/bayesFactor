@@ -84,14 +84,13 @@ else
     else
         df = N-1;
     end
-    pValue = tcdf(T,df,'upper'); % Right tailed
-        switch upper(tail)
+    switch upper(tail)
             case 'BOTH'
-                pValue = 2*(1-pValue );
+                pValue = 2 * tcdf(-abs(T), df);
             case 'LEFT'
-                pValue   =1-pValue ;
+                pValue = tcdf(T, df);
             case 'RIGHT'
-                % Ok as is
+                pValue = tcdf(-T, df);
         end        
 end
 
